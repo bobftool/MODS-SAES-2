@@ -1,0 +1,21 @@
+{
+  "manifest_version": 3,
+  "name": "MOD SAES 2 By ReprobadosDev",
+  "version": "1.0",
+  "description": "Evolución del MOD SAES.",
+  "permissions": ["storage", "activeTab", "scripting"],
+  "host_permissions": ["https://www.saes.upiita.ipn.mx/*"],
+  "action": {
+    "default_popup": "popup.html",
+    "default_icon": "pfp_R.png"
+  },
+  "icons": {
+    "128": "pfp_R.png"
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://www.saes.upiita.ipn.mx/Academica/horarios.aspx"],
+      "js": ["/content/horarios.js"]
+    }
+  ]
+}
