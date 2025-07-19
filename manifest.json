@@ -1,6 +1,6 @@
 {
   "manifest_version": 3,
-  "name": "MOD SAES 2 By ReprobadosDev",
+  "name": "MODS SAES 2 By ReprobadosDev",
   "version": "1.0",
   "description": "Evolución del MOD SAES.",
   "permissions": ["storage", "activeTab", "scripting"],

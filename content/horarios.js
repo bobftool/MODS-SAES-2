@@ -3,111 +3,38 @@ window.addEventListener("load", async () => {
   const { SAESform, SAESvisualizarButton } = getSAESelements();
   if (SAESvisualizarButton) SAESform.submit();
 
-  // Cargar el panel de generación de horarios
-  loadPanel();
-
   // Cargar banderas de control
   loadFlags();
 
-  // Obtener los elementos del panel
-  const { automaticContainer, buttonStartAutomatic } = getPanelElements();
-
-  // Opciones iniciales
-  automaticContainer.hidden = true; // Oculto por defecto
-  buttonStartAutomatic.addEventListener("click", (event) => {
-    startAutomatic(event);
-  });
-
-  // Obtener bandera de generación automática
+  // Obtener banderas
   const isAutomatic = (await chrome.storage.local.get("isAutomatic"))
     .isAutomatic;
 
+  // Cargar componentes HTML
+  loadComponents();
+
+  // Cargar estilos CSS
+  loadStyles(isAutomatic);
+
+  // Configurar el botón de generación automática
+  setupButtonStartAutomatic();
+
+  // Si se ha activado la generación automática, iniciar el controlador automático
   if (isAutomatic) {
     await automaticController();
   }
 });
-
-function loadPanel() {
-  // Generar el contenedor del panel
-  const panelContainer = document.createElement("div");
-  panelContainer.id = "panel-container";
-  // ------------------------------------
-
-  // Titulo del pnael
-  const panelTitle = document.createElement("h3");
-  panelTitle.id = "panel-title";
-  panelTitle.textContent = "Crea tu horario";
-  panelContainer.appendChild(panelTitle);
-  // ------------------------------------
-
-  // Opciones iniciales
-  const initialContainer = document.createElement("div");
-  initialContainer.id = "initial-container";
-  panelContainer.appendChild(initialContainer);
-
-  const buttonStartAutomatic = document.createElement("button");
-  buttonStartAutomatic.id = "button-start-automatic";
-  buttonStartAutomatic.textContent = "Generar automáticamente";
-  initialContainer.appendChild(buttonStartAutomatic);
-  // -------------------------------------------------
-
-  // Controles para generar horarios automáticamente
-  // Generar el contenedor de generación automática
-  const automaticContainer = document.createElement("div");
-  automaticContainer.id = "automatic-container";
-  panelContainer.appendChild(automaticContainer);
-
-  const automaticForm = document.createElement("form");
-  automaticForm.id = "automatic-form";
-  automaticContainer.appendChild(automaticForm);
-
-  const carreraLabel = document.createElement("label");
-  carreraLabel.textContent = "Carrera:";
-  automaticForm.appendChild(carreraLabel);
-
-  const carreraSelect = document.createElement("select");
-  carreraSelect.id = "carrera-select";
-  carreraSelect.multiple = false; // Solo una carrera a la vez
-  automaticForm.appendChild(carreraSelect);
-
-  const planLabel = document.createElement("label");
-  planLabel.id = "plan-label";
-  planLabel.textContent = "Plan de estudio:";
-  automaticForm.appendChild(planLabel);
-
-  const planSelect = document.createElement("select");
-  planSelect.id = "plan-select";
-  planSelect.multiple = false; // Solo un plan a la vez
-  automaticForm.appendChild(planSelect);
-
-  const asignaturasLabel = document.createElement("label");
-  asignaturasLabel.id = "asignaturas-label";
-  asignaturasLabel.textContent = "Asignaturas:";
-  automaticForm.appendChild(asignaturasLabel);
-
-  const asignaturasSelect = document.createElement("select");
-  asignaturasSelect.id = "asignaturas-select";
-  asignaturasSelect.multiple = true; // Seleccionar múltiples asignaturas
-  automaticForm.appendChild(asignaturasSelect);
-
-  const submitButton = document.createElement("button");
-  submitButton.id = "submit-button";
-  submitButton.textContent = "Generar horario";
-  submitButton.type = "submit"; // Enviar el formulario
-  automaticForm.appendChild(submitButton);
-  // ---------------------------------------
-
-  // Insertar el contenedor del panel en el DOM
-  const containerElement = document.querySelector(".container");
-  if (containerElement) containerElement.appendChild(panelContainer);
-  // ----------------------------------------------------------------
-}
 
 function loadFlags() {
   // Generación automática
   chrome.storage.local.get("isAutomatic", (result) => {
     if (result.isAutomatic == undefined)
       chrome.storage.local.set({ isAutomatic: false });
+  });
+  // Selección manual
+  chrome.storage.local.get("isManual", (result) => {
+    if (result.isManual == undefined)
+      chrome.storage.local.set({ isManual: false });
   });
   // Escaneo de clases
   chrome.storage.local.get("isScanning", (result) => {
@@ -116,21 +43,599 @@ function loadFlags() {
   });
 }
 
-function getPanelElements() {
+function loadComponents() {
+  const MultiSelectTagScript = `
+  function MultiSelectTag(el, customs = { shadow: false, rounded: true }) {
+    var element = null;
+    var options = null;
+    var customSelectContainer = null;
+    var wrapper = null;
+    var btnContainer = null;
+    var body = null;
+    var inputContainer = null;
+    var inputBody = null;
+    var input = null;
+    var button = null;
+    var drawer = null;
+    var ul = null;
+    var domParser = new DOMParser();
+    init();
+
+    function init() {
+      element = document.getElementById(el);
+      createElements();
+      initOptions();
+      enableItemSelection();
+      setValues(false);
+
+      body.addEventListener("click", () => {
+        if (drawer.classList.contains("hidden")) {
+          initOptions();
+          enableItemSelection();
+          drawer.classList.remove("hidden");
+          input.focus();
+        }
+      });
+
+      input.addEventListener("keyup", (e) => {
+        initOptions(e.target.value);
+        enableItemSelection();
+      });
+
+      input.addEventListener("keydown", (e) => {
+        if (
+          e.key === "Backspace" &&
+          !e.target.value &&
+          inputContainer.childElementCount > 1
+        ) {
+          const child =
+            body.children[inputContainer.childElementCount - 2].firstChild;
+          const option = options.find((op) => op.value == child.dataset.value);
+          option.selected = false;
+          removeTag(child.dataset.value);
+          setValues();
+        }
+      });
+
+      window.addEventListener("click", (e) => {
+        if (!customSelectContainer.contains(e.target)) {
+          drawer.classList.add("hidden");
+        }
+      });
+    }
+
+    function createElements() {
+      // Create custom elements
+      options = getOptions();
+      element.classList.add("hidden");
+
+      // .multi-select-tag
+      customSelectContainer = document.createElement("div");
+      customSelectContainer.classList.add("mult-select-tag");
+
+      // .container
+      wrapper = document.createElement("div");
+      wrapper.classList.add("wrapper");
+
+      // body
+      body = document.createElement("div");
+      body.classList.add("body");
+      if (customs.shadow) {
+        body.classList.add("shadow");
+      }
+      if (customs.rounded) {
+        body.classList.add("rounded");
+      }
+
+      // .input-container
+      inputContainer = document.createElement("div");
+      inputContainer.classList.add("input-container");
+
+      // input
+      input = document.createElement("input");
+      input.classList.add("input");
+      input.placeholder = "Buscar...";
+
+      inputBody = document.createElement("inputBody");
+      inputBody.classList.add("input-body");
+      inputBody.append(input);
+
+      body.append(inputContainer);
+
+      // .btn-container
+      btnContainer = document.createElement("div");
+      btnContainer.classList.add("btn-container");
+
+      // button
+      button = document.createElement("button");
+      button.type = "button";
+      btnContainer.append(button);
+
+      const icon = domParser.parseFromString(
+        ${`<svg xmlns="http://www.w3.org/2000/svg" width="100%" height="100%" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="18 15 12 21 6 15"></polyline></svg>`},
+        "image/svg+xml"
+      ).documentElement;
+      button.append(icon);
+
+      body.append(btnContainer);
+      wrapper.append(body);
+
+      drawer = document.createElement("div");
+      drawer.classList.add(...["drawer", "hidden"]);
+      if (customs.shadow) {
+        drawer.classList.add("shadow");
+      }
+      if (customs.rounded) {
+        drawer.classList.add("rounded");
+      }
+      drawer.append(inputBody);
+      ul = document.createElement("ul");
+
+      drawer.appendChild(ul);
+
+      customSelectContainer.appendChild(wrapper);
+      customSelectContainer.appendChild(drawer);
+
+      // Place TailwindTagSelection after the element
+      if (element.nextSibling) {
+        element.parentNode.insertBefore(
+          customSelectContainer,
+          element.nextSibling
+        );
+      } else {
+        element.parentNode.appendChild(customSelectContainer);
+      }
+    }
+
+    function initOptions(val = null) {
+      ul.innerHTML = "";
+      for (var option of options) {
+        if (option.selected) {
+          !isTagSelected(option.value) && createTag(option);
+        } else {
+          const li = document.createElement("li");
+          li.innerHTML = option.label;
+          li.dataset.value = option.value;
+
+          // For search
+          if (
+            val &&
+            option.label
+              .normalize("NFD")
+              .replace(/\p{Diacritic}/gu, "")
+              .toLowerCase()
+              .includes(
+                val
+                  .normalize("NFD")
+                  .replace(/\p{Diacritic}/gu, "")
+                  .toLowerCase()
+              )
+          ) {
+            ul.appendChild(li);
+          } else if (!val) {
+            ul.appendChild(li);
+          }
+        }
+      }
+    }
+
+    function createTag(option) {
+      // Create and show selected item as tag
+      const itemDiv = document.createElement("div");
+      itemDiv.classList.add("item-container");
+      const itemLabel = document.createElement("div");
+      itemLabel.classList.add("item-label");
+      itemLabel.innerHTML = option.label;
+      itemLabel.dataset.value = option.value;
+      const itemClose = new DOMParser().parseFromString(
+        ${`<svg xmlns="http://www.w3.org/2000/svg" width="100%" height="100%" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="item-close-svg">
+                  <line x1="18" y1="6" x2="6" y2="18"></line>
+                  <line x1="6" y1="6" x2="18" y2="18"></line>
+                  </svg>`},
+        "image/svg+xml"
+      ).documentElement;
+
+      itemClose.addEventListener("click", (e) => {
+        const unselectOption = options.find((op) => op.value == option.value);
+        unselectOption.selected = false;
+        removeTag(option.value);
+        initOptions();
+        setValues();
+      });
+
+      itemDiv.appendChild(itemLabel);
+      itemDiv.appendChild(itemClose);
+      inputContainer.append(itemDiv);
+    }
+
+    function enableItemSelection() {
+      // Add click listener to the list items
+      for (var li of ul.children) {
+        li.addEventListener("click", (e) => {
+          options.find(
+            (o) => o.value == e.target.dataset.value
+          ).selected = true;
+          input.value = null;
+          initOptions();
+          setValues();
+          //console.log('KKKKKKs');
+          input.focus();
+        });
+      }
+    }
+
+    function isTagSelected(val) {
+      // If the item is already selected
+      for (var child of inputContainer.children) {
+        if (
+          !child.classList.contains("input-body") &&
+          child.firstChild.dataset.value == val
+        ) {
+          return true;
+        }
+      }
+      return false;
+    }
+    function removeTag(val) {
+      // Remove selected item
+      for (var child of inputContainer.children) {
+        if (
+          !child.classList.contains("input-body") &&
+          child.firstChild.dataset.value == val
+        ) {
+          inputContainer.removeChild(child);
+        }
+      }
+    }
+    function setValues(fireEvent = true) {
+      // Update element final values
+      selected_values = [];
+      for (var i = 0; i < options.length; i++) {
+        element.options[i].selected = options[i].selected;
+        if (options[i].selected) {
+          selected_values.push({
+            label: options[i].label,
+            value: options[i].value,
+          });
+        }
+      }
+      if (fireEvent && customs.hasOwnProperty("onChange")) {
+        customs.onChange(selected_values);
+      }
+    }
+    function getOptions() {
+      // Map element options
+      return [...element.options].map((op) => {
+        return {
+          value: op.value,
+          label: op.label,
+          selected: op.selected,
+        };
+      });
+    }
+  }`;
+
+  const html =
+    // Contenido HTML
+    `<div id="container">
+    <div id="panel-container">
+      <div id="initial-container">
+        <h3 class="panel-title">Crea tu horario</h3>
+        <div class="buttons-container">
+          <button class="button" id="button-start-automatic">Generar automáticamente</button>
+          <button class="button" id="button-start-manual">Seleccionar manualmente</button>
+        </div>
+      </div>
+
+      <div id="automatic-container">
+        <h3 class="panel-title">Generar horario</h3>
+        <div id="form-container">
+          <div>
+            <label>Carrera:</label>
+            <select class="select" id="carrera-select"></select>
+          </div>
+
+          <div>
+            <label id="plan-label">Plan de estudio:</label>
+            <select class="select" id="plan-select"></select>
+          </div>
+
+          <div>
+            <label id="asignaturas-label">Asignaturas:</label>
+            <select id="asignaturas-select" multiple hidden></select>
+          </div>
+        </div>
+        <button class="button" id="button-generate-automatic">Generar horario</button>
+      </div>
+    </div>
+  </div>`;
+
+  // Insertar el HTML a la página
+  const containerElement = document.querySelector(".container");
+
+  if (containerElement) {
+    containerElement.insertAdjacentHTML("beforeend", html);
+  }
+}
+
+function loadStyles(isAutomatic) {
+  const MultiSelectTagStyles = `
+  .mult-select-tag {
+      display: flex;
+      width:100%;
+      flex-direction: column;
+      align-items: center;
+      position: relative;
+  }
+
+  .mult-select-tag .wrapper {
+      width: 100%;
+      border-radius: 9px;
+      overflow: hidden;
+      transition: box-shadow 0.5s ease, transform 0.5s ease;
+  }
+
+  .mult-select-tag .wrapper:hover {
+      box-shadow: 0 5px 9px rgba(0, 0, 0, 0.2);
+      transform: translateY(-2px);
+  }
+
+
+  .mult-select-tag .body {
+      display: flex;
+      background: #f0f0f0;
+      min-height: 36px;
+      width: 100%;
+      cursor: pointer;
+  }
+
+  .mult-select-tag .input-container {
+      display: flex;
+      flex-wrap: wrap;
+      flex: 1 1 auto;
+      padding: 0.1rem;
+  }
+
+  .mult-select-tag .input-body {
+      display: flex;
+      width: 100%;
+  }
+
+  .mult-select-tag .input {
+      flex:1;
+      background: white;
+      border-radius: 5px;
+      padding: 0.45rem;
+      margin: 10px;
+      outline: none;
+      border: none;
+  }
+
+  .mult-select-tag .btn-container {
+      color: var(--color-gris);
+      padding: 0.5rem;
+      display: flex;
+  }
+
+  .mult-select-tag button {
+      cursor: pointer;
+      width: 100%;
+      color: #000000;
+      outline: 0;
+      height: 100%;
+      border: none;
+      padding: 0;
+      background: transparent;
+      background-image: none;
+      -webkit-appearance: none;
+      text-transform: none;
+      margin: 0;
+  }
+
+  .mult-select-tag button:first-child {
+      width: 1rem;
+      height: 90%;
+  }
+
+
+  .mult-select-tag .drawer {
+      position: absolute;
+      background: #f0f0f0;
+      max-height: 15rem;
+      z-index: 40;
+      top: 98%;
+      width: 100%;
+      overflow-y: scroll;
+      border-radius: 9px;
+      box-shadow: 0 0 9px rgba(0, 0, 0, 0.2);
+  }
+
+  .mult-select-tag ul {
+      list-style-type: none;
+      padding: 0.5rem;
+      margin: 0;
+  }
+
+  .mult-select-tag ul li {
+      padding: 0.5rem;
+      border-radius: 5px;
+      cursor: pointer;
+  }
+
+  .mult-select-tag ul li:hover {
+      background: #b90b05;
+      color: white;
+      font-weight: bold;
+  }
+
+  .mult-select-tag .item-container {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      padding: 0.2rem 0.4rem;
+      margin: 0.2rem;
+      font-weight: bold;
+      background: #ffffff;
+      border-radius: 5px;
+      max-height: 20px;
+  }
+
+  .mult-select-tag .item-label {
+      max-width: 100%;
+      line-height: 1;
+      font-size: 0.75rem;
+      font-weight: 400;
+      flex: 0 1 auto;
+      color: #000000;
+  }
+
+  .mult-select-tag .item-close-container {
+      display: flex;
+      flex: 1 1 auto;
+      flex-direction: row-reverse;
+  }
+
+  .mult-select-tag .item-close-svg {
+      width: 1rem;
+      margin-left: 0.5rem;
+      height: 1rem;
+      cursor: pointer;
+      border-radius: 21px;
+      display: block;
+  }
+
+  .hidden {
+      display: none;
+  }`;
+
+  const styles =
+    // Hoja de estilos CSS
+    `
+    #container {
+      margin: 50px 0 30px;
+      display: block;
+      font-family: Arial, sans-serif;
+      color: black;
+    }
+
+    #panel-container {
+      background: white;
+      padding: 17px 21px;
+      border-radius: 21px;
+      box-shadow: 0 0 19px rgba(0, 0, 0, 0.2);
+    }
+
+    #initial-container {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+
+      ${isAutomatic ? "display: none;" : ""}
+    }
+
+    .panel-title {
+      margin: 0;
+      font-size: 19px;
+      font-weight: bold;
+    }
+
+    .buttons-container {
+      display: flex;
+      width: 100%;
+      gap: 10px;
+      align-items: center;
+    }
+
+    .button {
+      width: 100%;
+      padding: 10px;
+      background-color: #b90b05;
+      color: white;
+      border: none;
+      border-radius: 9px;
+      cursor: pointer;
+      font-weight: bold;
+      transition: box-shadow 0.5s ease, transform 0.5s ease;
+    }
+
+    .button:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 5px 9px rgba(0, 0, 0, 0.4);
+    }
+
+    #automatic-container {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+
+      ${isAutomatic ? "" : "display: none;"}
+    }
+
+    #form-container {
+      display: flex;
+      flex-direction: column;
+      gap: 7px;
+      width: 100%;
+    }
+
+    #form-container label {
+      font-weight: bold;
+      display: block;
+    }
+
+    .select{
+      width: 100%;
+      padding: 10px;
+      border: none;
+      border-radius: 9px;
+      cursor: pointer;
+      background-color: #f0f0f0;
+      transition: box-shadow 0.5s ease, transform 0.5s ease;
+    }
+
+    .select:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 5px 9px rgba(0, 0, 0, 0.2);
+    }
+
+    .select:focus {
+      transform: translateY(-2px);
+      box-shadow: 0 5px 9px rgba(0, 0, 0, 0.2);
+    }
+
+    ${MultiSelectTagStyles}
+  `;
+
+  // Crear un elemento de estilo
+  const styleElement = document.createElement("style");
+  styleElement.textContent = styles;
+  // Insertar el elemento de estilo en el head del documento
+  document.head.appendChild(styleElement);
+}
+
+function setupButtonStartAutomatic() {
+  const { buttonStartAutomatic } = getComponents();
+
+  buttonStartAutomatic.addEventListener("click", startAutomatic);
+}
+
+function getComponents() {
   return {
     panelContainer: document.getElementById("panel-container"),
     panelTitle: document.getElementById("panel-title"),
     initialContainer: document.getElementById("initial-container"),
     buttonStartAutomatic: document.getElementById("button-start-automatic"),
     automaticContainer: document.getElementById("automatic-container"),
-    automaticForm: document.getElementById("automatic-form"),
     carreraLabel: document.getElementById("carrera-label"),
     carreraSelect: document.getElementById("carrera-select"),
     planLabel: document.getElementById("plan-label"),
     planSelect: document.getElementById("plan-select"),
     asignaturasLabel: document.getElementById("asignaturas-label"),
     asignaturasSelect: document.getElementById("asignaturas-select"),
-    submitButton: document.getElementById("submit-button"),
+    buttonGenerateAutomatic: document.getElementById(
+      "button-generate-automatic"
+    ),
   };
 }
 
@@ -155,7 +660,6 @@ function getSAESelements() {
 }
 
 function startAutomatic(event) {
-  // Evitar que se recargue la página
   event.preventDefault();
 
   // Bandera para indicar que se ha iniciado el proceso de generación automática
@@ -166,38 +670,11 @@ function startAutomatic(event) {
 }
 
 async function automaticController() {
-  // Obtener elementos del panel
-  const {
-    initialContainer,
-    automaticContainer,
-    planLabel,
-    planSelect,
-    asignaturasLabel,
-    asignaturasSelect,
-    submitButton,
-  } = getPanelElements();
-
   // Obtener elementos del SAES
   const { SAEScarreraSelect, SAESplanSelect } = getSAESelements();
 
-  // Mostrar el contenedor de generación automática y ocultar las opciones iniciales
-  automaticContainer.hidden = false;
-  initialContainer.hidden = true;
-
-  // Ocultar el label y selector de plan de estudio si aún no se ha seleccionado una carrera
-  planLabel.hidden = true;
-  planSelect.hidden = true;
-
-  // Ocultar el label y selector de asignaturas si aún no se ha seleccionado un plan de estudio
-  asignaturasLabel.hidden = true;
-  asignaturasSelect.hidden = true;
-
-  // Ocultar el botón de generar horario
-  submitButton.hidden = true;
-
   // Obtener las carreras disponibles y guardarlas en el almacenamiento local
   const carreras = getSelectorOptions(SAEScarreraSelect);
-  chrome.storage.local.set({ carreras });
 
   // Obtener carrera seleccionada previamente
   const selectedCarrera = (await chrome.storage.local.get("selectedCarrera"))
@@ -214,7 +691,6 @@ async function automaticController() {
 
     // Obtener los planes de estudio disponibles
     const planes = getSelectorOptions(SAESplanSelect);
-    chrome.storage.local.set({ planes });
 
     // Obtener el plan de estudio seleccionado previamente
     const selectedPlan = (await chrome.storage.local.get("selectedPlan"))
@@ -247,10 +723,7 @@ async function automaticController() {
         setupAsignaturasSelect(asignaturas, selectedAsignaturas);
 
         // Configurar el formulario de generación de horarios
-        setupAutomaticForm();
-
-        // Mostrar botón de generar horario
-        submitButton.hidden = false;
+        setupButtonGenerateAutomatic();
       }
     }
   }
@@ -273,7 +746,7 @@ function changeSelectorValue(selector, value) {
 }
 
 async function setupCarreraSelect(carreras, defaultCarrera) {
-  const { carreraSelect } = getPanelElements();
+  const { carreraSelect } = getComponents();
   const { SAEScarreraSelect } = getSAESelements();
 
   // Cargar las carreras en el select de carreras
@@ -325,7 +798,7 @@ async function setupCarreraSelect(carreras, defaultCarrera) {
 }
 
 async function setupPlanSelect(planes, defaultPlan) {
-  const { planLabel, planSelect } = getPanelElements();
+  const { planLabel, planSelect } = getComponents();
   const { SAESplanSelect } = getSAESelements();
 
   // Mostrar el label y selector de plan de estudio
@@ -452,7 +925,7 @@ async function clasesScanner() {
 
 async function scannHorariosTable(horariosTable) {
   // Recuperar las clases ya escaneadas o inicializar un array vacío
-  let clases = (await chrome.storage.local.get("clases")).clases || [];
+  let clases = (await chrome.storage.local.get("dataClases")).dataClases || [];
 
   // Recuperar las asignaturas ya escaneadas o inicializar un array vacío
   let asignaturas =
@@ -510,18 +983,14 @@ async function scannHorariosTable(horariosTable) {
   }
 
   // Actualizar clases escaneadas
-  chrome.storage.local.set({ clases });
+  chrome.storage.local.set({ dataClases: clases });
 
   // Actualizar asignaturas escaneadas
   chrome.storage.local.set({ dataAsignaturas: asignaturas });
 }
 
 function setupAsignaturasSelect(asignaturas, selectedAsignaturas) {
-  const { asignaturasLabel, asignaturasSelect } = getPanelElements();
-
-  // Mostrar el label y selector de asignaturas
-  asignaturasLabel.hidden = false;
-  asignaturasSelect.hidden = false;
+  const { asignaturasSelect } = getComponents();
 
   // Cargar las asignaturas en el select de asignaturas
   asignaturas.forEach((asignatura) => {
@@ -543,12 +1012,284 @@ function setupAsignaturasSelect(asignaturas, selectedAsignaturas) {
     // Guardar las asignaturas seleccionadas en el almacenamiento local
     chrome.storage.local.set({ selectedAsignaturas: selectedOptions });
   });
+
+  // Crear elemento de interfaz MultiSelectTag
+  MultiSelectTag("asignaturas-select");
 }
 
-function setupAutomaticForm() {
-  const { automaticForm, asignaturasSelect } = getPanelElements();
+function MultiSelectTag(el, customs = { shadow: false, rounded: true }) {
+  var element = null;
+  var options = null;
+  var customSelectContainer = null;
+  var wrapper = null;
+  var btnContainer = null;
+  var body = null;
+  var inputContainer = null;
+  var inputBody = null;
+  var input = null;
+  var button = null;
+  var drawer = null;
+  var ul = null;
+  var domParser = new DOMParser();
+  init();
 
-  automaticForm.addEventListener("submit", async (event) => {
+  function init() {
+    element = document.getElementById(el);
+    createElements();
+    initOptions();
+    enableItemSelection();
+    setValues(false);
+
+    body.addEventListener("click", () => {
+      if (drawer.classList.contains("hidden")) {
+        initOptions();
+        enableItemSelection();
+        drawer.classList.remove("hidden");
+        input.focus();
+      }
+    });
+
+    input.addEventListener("keyup", (e) => {
+      initOptions(e.target.value);
+      enableItemSelection();
+    });
+
+    input.addEventListener("keydown", (e) => {
+      if (
+        e.key === "Backspace" &&
+        !e.target.value &&
+        inputContainer.childElementCount > 1
+      ) {
+        const child =
+          body.children[inputContainer.childElementCount - 2].firstChild;
+        const option = options.find((op) => op.value == child.dataset.value);
+        option.selected = false;
+        removeTag(child.dataset.value);
+        setValues();
+      }
+    });
+
+    window.addEventListener("click", (e) => {
+      if (!customSelectContainer.contains(e.target)) {
+        drawer.classList.add("hidden");
+      }
+    });
+  }
+
+  function createElements() {
+    // Create custom elements
+    options = getOptions();
+    element.classList.add("hidden");
+
+    // .multi-select-tag
+    customSelectContainer = document.createElement("div");
+    customSelectContainer.classList.add("mult-select-tag");
+
+    // .container
+    wrapper = document.createElement("div");
+    wrapper.classList.add("wrapper");
+
+    // body
+    body = document.createElement("div");
+    body.classList.add("body");
+    if (customs.shadow) {
+      body.classList.add("shadow");
+    }
+    if (customs.rounded) {
+      body.classList.add("rounded");
+    }
+
+    // .input-container
+    inputContainer = document.createElement("div");
+    inputContainer.classList.add("input-container");
+
+    // input
+    input = document.createElement("input");
+    input.classList.add("input");
+    input.placeholder = `${customs.placeholder || "Buscar..."}`;
+
+    inputBody = document.createElement("inputBody");
+    inputBody.classList.add("input-body");
+    inputBody.append(input);
+
+    body.append(inputContainer);
+
+    // .btn-container
+    btnContainer = document.createElement("div");
+    btnContainer.classList.add("btn-container");
+
+    // button
+    button = document.createElement("button");
+    button.type = "button";
+    btnContainer.append(button);
+
+    const icon = domParser.parseFromString(
+      `<svg xmlns="http://www.w3.org/2000/svg" width="100%" height="100%" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="18 15 12 21 6 15"></polyline></svg>`,
+      "image/svg+xml"
+    ).documentElement;
+    button.append(icon);
+
+    body.append(btnContainer);
+    wrapper.append(body);
+
+    drawer = document.createElement("div");
+    drawer.classList.add(...["drawer", "hidden"]);
+    if (customs.shadow) {
+      drawer.classList.add("shadow");
+    }
+    if (customs.rounded) {
+      drawer.classList.add("rounded");
+    }
+    drawer.append(inputBody);
+    ul = document.createElement("ul");
+
+    drawer.appendChild(ul);
+
+    customSelectContainer.appendChild(wrapper);
+    customSelectContainer.appendChild(drawer);
+
+    // Place TailwindTagSelection after the element
+    if (element.nextSibling) {
+      element.parentNode.insertBefore(
+        customSelectContainer,
+        element.nextSibling
+      );
+    } else {
+      element.parentNode.appendChild(customSelectContainer);
+    }
+  }
+
+  function initOptions(val = null) {
+    ul.innerHTML = "";
+    for (var option of options) {
+      if (option.selected) {
+        !isTagSelected(option.value) && createTag(option);
+      } else {
+        const li = document.createElement("li");
+        li.innerHTML = option.label;
+        li.dataset.value = option.value;
+
+        // For search
+        if (
+          val &&
+          option.label
+            .normalize("NFD")
+            .replace(/\p{Diacritic}/gu, "")
+            .toLowerCase()
+            .includes(
+              val
+                .normalize("NFD")
+                .replace(/\p{Diacritic}/gu, "")
+                .toLowerCase()
+            )
+        ) {
+          ul.appendChild(li);
+        } else if (!val) {
+          ul.appendChild(li);
+        }
+      }
+    }
+  }
+
+  function createTag(option) {
+    // Create and show selected item as tag
+    const itemDiv = document.createElement("div");
+    itemDiv.classList.add("item-container");
+    const itemLabel = document.createElement("div");
+    itemLabel.classList.add("item-label");
+    itemLabel.innerHTML = option.label;
+    itemLabel.dataset.value = option.value;
+    const itemClose = new DOMParser().parseFromString(
+      `<svg xmlns="http://www.w3.org/2000/svg" width="100%" height="100%" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="item-close-svg">
+                <line x1="18" y1="6" x2="6" y2="18"></line>
+                <line x1="6" y1="6" x2="18" y2="18"></line>
+                </svg>`,
+      "image/svg+xml"
+    ).documentElement;
+
+    itemClose.addEventListener("click", (e) => {
+      const unselectOption = options.find((op) => op.value == option.value);
+      unselectOption.selected = false;
+      removeTag(option.value);
+      initOptions();
+      setValues();
+    });
+
+    itemDiv.appendChild(itemLabel);
+    itemDiv.appendChild(itemClose);
+    inputContainer.append(itemDiv);
+  }
+
+  function enableItemSelection() {
+    // Add click listener to the list items
+    for (var li of ul.children) {
+      li.addEventListener("click", (e) => {
+        options.find((o) => o.value == e.target.dataset.value).selected = true;
+        input.value = null;
+        initOptions();
+        setValues();
+        //console.log('KKKKKKs');
+        input.focus();
+      });
+    }
+  }
+
+  function isTagSelected(val) {
+    // If the item is already selected
+    for (var child of inputContainer.children) {
+      if (
+        !child.classList.contains("input-body") &&
+        child.firstChild.dataset.value == val
+      ) {
+        return true;
+      }
+    }
+    return false;
+  }
+  function removeTag(val) {
+    // Remove selected item
+    for (var child of inputContainer.children) {
+      if (
+        !child.classList.contains("input-body") &&
+        child.firstChild.dataset.value == val
+      ) {
+        inputContainer.removeChild(child);
+      }
+    }
+  }
+  function setValues(fireEvent = true) {
+    // Update element final values
+    selected_values = [];
+    for (var i = 0; i < options.length; i++) {
+      element.options[i].selected = options[i].selected;
+      if (options[i].selected) {
+        selected_values.push({
+          label: options[i].label,
+          value: options[i].value,
+        });
+      }
+    }
+    if (fireEvent && customs.hasOwnProperty("onChange")) {
+      customs.onChange(selected_values);
+    }
+  }
+  function getOptions() {
+    // Map element options
+    return [...element.options].map((op) => {
+      return {
+        value: op.value,
+        label: op.label,
+        selected: op.selected,
+      };
+    });
+  }
+}
+
+function setupButtonGenerateAutomatic() {
+  const { buttonGenerateAutomatic, asignaturasSelect } = getComponents();
+
+  buttonGenerateAutomatic.addEventListener("click", async (event) => {
     // Evitar que se recargue la página
     event.preventDefault();
 
@@ -564,7 +1305,8 @@ function setupAutomaticForm() {
 
 async function generateHorarios(selectedAsignaturas) {
   // Obtener las clases escaneadas
-  const clases = (await chrome.storage.local.get("clases")).clases || [];
+  const clases =
+    (await chrome.storage.local.get("dataClases")).dataClases || [];
 
   // Obtener solo las clases que coinciden con las asignaturas seleccionadas
   const filteredClases = filtrarClases(clases, selectedAsignaturas);
@@ -795,290 +1537,3 @@ function orderByHorasLibres(horarios) {
   // Ordenar los horarios por horas libres (de menor a mayor)
   return horarios.sort((a, b) => a.horasLibres - b.horasLibres);
 }
-
-// ---
-/*
-function getPlanEstudios(carrera) {
-  let carrerasSelect = document.getElementById(
-    "ctl00_mainCopy_Filtro_cboCarrera"
-  );
-  Array.from(carrerasSelect.options).forEach((option) => {
-    if (option.value === carrera) {
-      option.selected = "selected"; // Seleccionar la carrera
-      carrerasSelect.dispatchEvent(new Event("change")); // Disparar el evento de cambio para actualizar los planes de estudio
-    }
-  });
-}
-*/
-
-/*
-async function getData() {
-  let data = {
-    horarios: [],
-    carreras: [],
-    planes: [],
-    asignaturas: [],
-    profesores: [],
-    lastUpdate: new Date().toISOString(),
-  };
-
-  // Obtener el formulario de filtros
-  let form = document.getElementById("aspnetForm");
-
-  // Obtener las carreras disponibles
-  let carreras = document
-    .getElementById("ctl00_mainCopy_Filtro_cboCarrera")
-    .getElementsByTagName("option");
-
-  // Escanear las carreras
-  console.log("Escaneando carreras...");
-  console.log(carreras.length, "carreras encontradas");
-  for (let i = 0, n = carreras.length; i < n; i++) {
-    carreras[i].selected = "selected"; // Se simula un click en cada carrera
-    await form.submit(); // Se envía el formulario para cargar los datos de la carrera actual
-    const start = Date.now();
-    while (Date.now() - start < 2000);
-
-    // Se guardan las carreras en un array separado y en los horarios solo se almacena el índice para ahorrar espacio
-    data.carreras.push(carreras[i].textContent);
-    carreraIndex = data.carreras.length - 1;
-
-    // Obtener los planes de estudio para la carrera actual
-    let planes = document
-      .getElementById("ctl00_mainCopy_Filtro_cboPlanEstud")
-      .getElementsByTagName("option");
-
-    // Escanear los planes de estudio
-    console.log("Escaneando planes de estudio...");
-    console.log(planes.length, "planes encontrados");
-    for (let j = 0, w = planes.length; j < w; j++) {
-      planes[j].selected = "selected"; // Se simula un click en cada plan
-      form.submit(); // Se envía el formulario para cargar los datos del plan actual
-
-      // Los planes estan vinculados a una carrera
-      let plan = {
-        nombre: planes[j].textContent.trim(),
-        carrera: carreraIndex,
-      };
-      // Se guardan los planes en un array separado y en los horarios solo se almacena el índice para ahorrar espacio
-      data.planes.push(plan);
-      planIndex = data.planes.length - 1;
-
-      // Obtener los turnos disponibles para la carrera actual
-      let turnos = document
-        .getElementById("ctl00_mainCopy_Filtro_cboTurno")
-        .getElementsByTagName("option");
-
-      // Escanear los turnos
-      console.log("Escaneando turnos...");
-      console.log(turnos.length, "turnos encontrados");
-      for (let k = 0, o = turnos.length; k < o; k++) {
-        turnos[k].selected = "selected"; // Se simula un click en cada turno
-        form.submit(); // Se envía el formulario para cargar los datos del turno actual
-
-        // Obtener los periodos disponibles para la carrera actual
-        let periodos = document
-          .getElementById("ctl00_mainCopy_Filtro_lsNoPeriodos")
-          .getElementsByTagName("option");
-
-        // Escanear los periodos
-        console.log("Escaneando periodos...");
-        console.log(periodos.length, "periodos encontrados");
-        for (let l = 0, p = periodos.length; l < p; l++) {
-          periodos[l].selected = "selected"; // Se simula un click en cada periodo
-          form.submit(); // Se envía el formulario para cargar los datos del periodo actual
-
-          //Obtener la tabla de horarios
-          let horariosTable = document.getElementById(
-            "ctl00_mainCopy_dbgHorarios"
-          );
-
-          if (!horariosTable) continue; // Si no hay tabla de horarios, continuar con el siguiente periodo
-
-          // Obtener las filas de la tabla de horarios
-          let horariosRows = horariosTable
-            .getElementsByTagName("tbody")[0]
-            .getElementsByTagName("tr");
-
-          // Escanear las filas de la tabla de horarios
-          console.log("Escaneando filas de horarios...");
-          console.log(horariosRows.length, "filas encontradas");
-          console.log("Carrera:", carreras[i].textContent.trim());
-          console.log("Plan:", plan.nombre);
-          console.log("Turno:", turnos[k].textContent.trim());
-          console.log("Periodo:", periodos[l].textContent.trim());
-
-          for (let m = 1, q = horariosRows.length; m < q; m++) {
-            // Obtener las columnas de la fila actual
-            let rowColumns = horariosRows[m].getElementsByTagName("td");
-
-            // Extraer los datos de la fila actual
-            let grupo = rowColumns[0].textContent.trim();
-            // Las asignaturas estan vinculadas a una carrera y a un plan de estudio
-            let asignatura = {
-              nombre: rowColumns[1].textContent.trim(),
-              carrera: carreraIndex,
-              plan: planIndex,
-            };
-            let profesor = rowColumns[2].textContent.trim();
-            let horas = {
-              lunes: rowColumns[5].textContent.trim(),
-              martes: rowColumns[6].textContent.trim(),
-              miercoles: rowColumns[7].textContent.trim(),
-              jueves: rowColumns[8].textContent.trim(),
-              viernes: rowColumns[9].textContent.trim(),
-            };
-
-            // Se guardan las asignaturas en un array separado y en los horarios solo se almacena el índice para ahorrar espacio
-            // Buscar si la asignatura ya existe en el array de asignaturas
-            let asignaturaIndex = data.asignaturas.findIndex(
-              (a) =>
-                a.nombre === asignatura.nombre &&
-                a.carrera === asignatura.carrera &&
-                a.plan === asignatura.plan
-            );
-            // Si no existe, se agrega al array de asignaturas
-            if (asignaturaIndex == -1) {
-              data.asignaturas.push(asignatura);
-              asignaturaIndex = data.asignaturas.length - 1;
-            }
-
-            // Se guardan los profesores en un array separado y en los horarios solo se almacena el índice para ahorrar espacio
-            // Buscar si el profesor ya existe en el array de profesores
-            let profesorIndex = data.profesores.indexOf(profesor);
-            // Si no existe, se agrega al array de profesores
-            if (profesorIndex == -1) {
-              data.profesores.push(profesor);
-              profesorIndex = data.profesores.length - 1;
-            }
-
-            let clase = {
-              grupo,
-              asignatura: asignaturaIndex,
-              profesor: profesorIndex,
-              horas,
-            };
-
-            data.horarios.push(clase);
-          }
-        }
-      }
-    }
-
-    //-----------------------------------------------------------------
-    }
-
-  return data;
-}
-*/
-
-/*
-function generateHorarios() {
-  chrome.storage.local.get("horarios", ({ horarios }) => {
-    if (horarios && horarios.length > 0) {
-      const asignaturas = [
-        ...new Set(
-          horarios.map((h) => {
-            return { nombre: h.asignatura, carrera: h.carrera };
-          })
-        ),
-      ];
-      const profesores = [...new Set(horarios.map((h) => h.profesor))];
-      const carreras = [...new Set(asignaturas.map((a) => a.carrera))];
-
-      const form = document.createElement("form");
-
-      const carreraLabel = document.createElement("label");
-      carreraLabel.textContent = "Carrera:";
-      const carreraSelect = document.createElement("select");
-      carreraSelect.multiple = false;
-
-      carreras.forEach((carrera) => {
-        const option = document.createElement("option");
-        option.value = carrera;
-        option.textContent = carrera;
-        carreraSelect.appendChild(option);
-      });
-
-      const asignaturaLabel = document.createElement("label");
-      asignaturaLabel.textContent = "Asignaturas:";
-      const asignaturaSelect = document.createElement("select");
-      asignaturaSelect.multiple = true;
-      asignaturas.forEach((asignatura) => {
-        const option = document.createElement("option");
-        option.value = asignatura.nombre;
-        option.textContent = asignatura.nombre;
-        option.dataset.carrera = asignatura.carrera;
-        asignaturaSelect.appendChild(option);
-      });
-
-      carreraSelect.addEventListener("change", () => {
-        const selectedCarrera = carreraSelect.value;
-        Array.from(asignaturaSelect.options).forEach((option) => {
-          option.style.display =
-            option.dataset.carrera === selectedCarrera || !selectedCarrera
-              ? "block"
-              : "none";
-        });
-      });
-
-      const profesorLabel = document.createElement("label");
-      profesorLabel.textContent = "Profesores:";
-      const profesorSelect = document.createElement("select");
-      profesorSelect.multiple = true;
-      profesores.forEach((profesor) => {
-        const option = document.createElement("option");
-        option.value = profesor;
-        option.textContent = profesor;
-        profesorSelect.appendChild(option);
-      });
-
-      const submitButton = document.createElement("button");
-      submitButton.type = "submit";
-      submitButton.textContent = "Filtrar";
-
-      form.appendChild(carreraLabel);
-      form.appendChild(carreraSelect);
-      form.appendChild(asignaturaLabel);
-      form.appendChild(asignaturaSelect);
-      form.appendChild(profesorLabel);
-      form.appendChild(profesorSelect);
-      form.appendChild(submitButton);
-
-      form.addEventListener("submit", (event) => {
-        event.preventDefault();
-        const selectedCarrera = carreraSelect.value;
-        const selectedAsignaturas = Array.from(
-          asignaturaSelect.selectedOptions
-        ).map((option) => option.value);
-        const selectedProfesores = Array.from(
-          profesorSelect.selectedOptions
-        ).map((option) => option.value);
-        filterHorarios(
-          selectedCarrera,
-          selectedAsignaturas,
-          selectedProfesores
-        );
-      });
-
-      message.appendChild(form);
-    }
-  });
-
-  function filterHorarios(carrera, asignaturas, profesores) {
-    chrome.storage.local.get("horarios", ({ horarios }) => {
-      if (horarios && horarios.length > 0) {
-        const filteredHorarios = horarios.filter(
-          (horario) =>
-            (carrera === "" || horario.carrera === carrera) &&
-            (asignaturas.length === 0 ||
-              asignaturas.includes(horario.asignatura)) &&
-            (profesores.length === 0 || profesores.includes(horario.profesor))
-        );
-        console.log("Filtered Horarios:", filteredHorarios);
-        // You can add further actions with filteredHorarios here
-      }
-    });
-  }
-}
-*/
