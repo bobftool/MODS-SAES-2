@@ -1,27 +1,53 @@
 window.addEventListener("load", async () => {
   // Visualizar información
-  const { SAESform, SAESvisualizarButton } = getSAESelements();
+  const { SAESform, SAESvisualizarButton } = getSAEScomponents();
   if (SAESvisualizarButton) SAESform.submit();
 
   // Cargar banderas de control
   loadFlags();
 
+  // Obtener horarios guardados por el usuario
+  const horariosGuardados =
+    (await chrome.storage.local.get("userHorariosGuardados"))
+      .userHorariosGuardados || [];
+
+  const hasHorariosGuardados = horariosGuardados.length > 0;
+
+  // Obtener horarios generados por el usuario
+  const horariosGenerados =
+    (await chrome.storage.local.get("userHorariosGenerados"))
+      .userHorariosGenerados || [];
+  const hasHorariosGenerados = horariosGenerados.length > 0;
+
   // Obtener banderas
   const isAutomatic = (await chrome.storage.local.get("isAutomatic"))
     .isAutomatic;
+  const isManual = (await chrome.storage.local.get("isManual")).isManual;
 
   // Cargar componentes HTML
   loadComponents();
 
   // Cargar estilos CSSs
-  loadStyles(isAutomatic);
+  loadStyles(isAutomatic, isManual, hasHorariosGenerados, hasHorariosGuardados);
 
   // Configurar el botón de generación automática
   setupButtonStartAutomatic();
 
+  // Configurar el botón de selección manual
+  setupButtonStartManual();
+
   // Si se ha activado la generación automática, iniciar el controlador automático
   if (isAutomatic) {
     await automaticController();
+  }
+
+  // Si se ha activado la selección manual, iniciar el controlador manual
+  if (isManual) {
+    await manualController();
+  }
+
+  if (hasHorariosGuardados) {
+    setupContainerHorariosGuardados(horariosGuardados);
   }
 });
 
@@ -46,8 +72,8 @@ function loadFlags() {
 function loadComponents() {
   const html =
     // Contenido HTML
-    `<div id="container">
-    <div id="panel-container">
+    `<div class="reprobados-container">
+    <div class="panel-container">
       <div id="initial-container">
         <h3 class="panel-title">Crea tu horario</h3>
         <div class="buttons-container">
@@ -59,8 +85,8 @@ function loadComponents() {
       <div id="automatic-container">
         <div id="title-container">
           <h3 class="panel-title">Generar horarios</h3>
-          <button id="button-automatic-update" class="mini-button">Actualizar</button>
-          <button id="button-automatic-finish" class="mini-button">Finalizar</button>
+          <button id="button-automatic-update" class="button-mini">Actualizar</button>
+          <button id="button-automatic-finish" class="button-mini">Finalizar</button>
         </div>
         <div id="form-container">
           <div>
@@ -84,10 +110,30 @@ function loadComponents() {
           <p>Generando horarios, por favor espera...</p>
         </div>
 
-        <div id="horarios-generados-container">
-          <div id="horarios-generados-slider"></div>
+        <div class="horarios-container">
+          <div id="horarios-slider-automatic" class="horarios-slider"></div>
         </div>
       </div>
+
+      <div id="manual-container">
+        <div id="title-container">
+          <h3 class="panel-title">Selección manual</h3>
+          <button id="button-manual-finish" class="button-mini">Finalizar</button>
+        </div>
+        
+        <div class="horarios-container">
+          <div id="horarios-slider-manual" class="horarios-slider"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="reprobados-container" id="guardados-container">
+        <div class="panel-container">
+          <h3 class="panel-title">Tus horarios guardados</h3>
+          <div class="horarios-container">
+            <div id="horarios-slider-guardados" class="horarios-slider"></div>
+          </div>
+        </div>
     </div>
   </div>`;
 
@@ -95,11 +141,16 @@ function loadComponents() {
   const containerElement = document.querySelector(".container");
 
   if (containerElement) {
-    containerElement.insertAdjacentHTML("beforeend", html);
+    containerElement.insertAdjacentHTML("afterbegin", html);
   }
 }
 
-function loadStyles(isAutomatic, isScanning) {
+function loadStyles(
+  isAutomatic,
+  isManual,
+  hasHorariosGenerados,
+  hasHorariosGuardados
+) {
   const MultiSelectTagStyles = `
   .mult-select-tag {
       display: flex;
@@ -252,14 +303,15 @@ function loadStyles(isAutomatic, isScanning) {
   const styles =
     // Hoja de estilos CSS
     `
-    #container {
-      margin: 50px 0 20px;
+    .reprobados-container {
+      margin: 20px 0 20px;
       display: block;
       font-family: Arial, sans-serif;
       color: black;
+      max-width: 600px;
     }
 
-    #panel-container {
+    .panel-container {
       background: white;
       padding: 17px 21px;
       border-radius: 21px;
@@ -271,7 +323,7 @@ function loadStyles(isAutomatic, isScanning) {
       flex-direction: column;
       gap: 10px;
 
-      ${isAutomatic ? "display: none;" : ""}
+      ${isAutomatic || isManual ? "display: none;" : ""}
     }
 
     .panel-title {
@@ -394,16 +446,20 @@ function loadStyles(isAutomatic, isScanning) {
       }
     }
 
-    #horarios-generados-slider{
+    #horarios-slider-automatic{
+      ${hasHorariosGenerados ? "" : "display: none;"}
+    }
+
+    .horarios-slider{
       display: flex;
       flex-direction: row;
-      gap: 11px;
+      gap: 9px;
       overflow-x: scroll;
       align-items: stretch;
       scroll-snap-type: x mandatory;
     }
 
-    #horarios-generados-slider > * {
+    .horarios-slider > * {
       scroll-snap-align: center;
     }
 
@@ -427,17 +483,22 @@ function loadStyles(isAutomatic, isScanning) {
       vertical-align: middle;
     }
 
-    .horario th, tfoot {
-      background-color: #b90b05;
-      color: white;
-    }
-
     .horario tr {
       padding: 5px 0;
+      background: white;
     }
 
     .horario tr:nth-child(even) {
-      background-color: #f0f0f0;
+      background: #f0f0f0;
+    }
+
+    .horario th {
+      background: #b90b05; 
+      color: white;
+    }
+
+    #credits {
+      font-weight: bold;
     }
 
     .button-micro{
@@ -456,7 +517,39 @@ function loadStyles(isAutomatic, isScanning) {
       box-shadow: 0 5px 9px rgba(0, 0, 0, 0.4);
     }
 
+    #manual-container {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
 
+      ${isManual ? "" : "display: none;"}
+    }
+
+    #guardados-container {
+      ${hasHorariosGuardados ? "" : "display: none;"}
+    }
+
+    .horarios-container {
+      margin-top: 10px;
+      background-color: #f0f0f0;
+      border-radius: 9px;
+      overflow: hidden;
+      box-shadow: inset 0 0px 9px rgba(0,0,0,0.12);
+    }
+
+    .button-mini {
+      border-radius: 9px;
+      font-size: 11px;
+      background: #f0f0f0;
+      padding: 6.5px 8px;
+      cursor: pointer;
+      transition: box-shadow 0.5s ease, transform 0.5s ease;
+    }
+
+    .button-mini:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 5px 9px rgba(0, 0, 0, 0.2);
+    }
 
     ${MultiSelectTagStyles}
   `;
@@ -474,12 +567,19 @@ function setupButtonStartAutomatic() {
   buttonStartAutomatic.addEventListener("click", startAutomatic);
 }
 
+function setupButtonStartManual() {
+  const { buttonStartManual } = getComponents();
+
+  buttonStartManual.addEventListener("click", startManual);
+}
+
 function getComponents() {
   return {
     panelContainer: document.getElementById("panel-container"),
     panelTitle: document.getElementById("panel-title"),
     initialContainer: document.getElementById("initial-container"),
     buttonStartAutomatic: document.getElementById("button-start-automatic"),
+    buttonStartManual: document.getElementById("button-start-manual"),
     automaticContainer: document.getElementById("automatic-container"),
     carreraLabel: document.getElementById("carrera-label"),
     carreraSelect: document.getElementById("carrera-select"),
@@ -493,10 +593,11 @@ function getComponents() {
     warning: document.getElementById("warning"),
     buttonUpdateAutomatic: document.getElementById("button-automatic-update"),
     buttonFinishAutomatic: document.getElementById("button-automatic-finish"),
+    buttonFinishManual: document.getElementById("button-manual-finish"),
   };
 }
 
-function getSAESelements() {
+function getSAEScomponents() {
   return {
     SAESform: document.getElementById("aspnetForm"),
     SAESvisualizarButton: document.getElementById(
@@ -512,7 +613,9 @@ function getSAESelements() {
     SAESperiodoSelect: document.getElementById(
       "ctl00_mainCopy_Filtro_lsNoPeriodos"
     ),
-    SAEShorariosTable: document.getElementById("ctl00_mainCopy_dbgHorarios"),
+    SAEShorariosTable:
+      document.getElementById("ctl00_mainCopy_dbgHorarios") ||
+      document.getElementById("regs"),
   };
 }
 
@@ -526,9 +629,19 @@ function startAutomatic(event) {
   window.location.reload();
 }
 
+function startManual(event) {
+  event.preventDefault();
+
+  // Bandera para indicar que se ha iniciado el proceso de generación automática
+  chrome.storage.local.set({ isManual: true });
+
+  // Recargar la página para aplicar los cambios
+  window.location.reload();
+}
+
 async function automaticController() {
   // Obtener elementos del SAES
-  const { SAEScarreraSelect, SAESplanSelect } = getSAESelements();
+  const { SAEScarreraSelect, SAESplanSelect } = getSAEScomponents();
 
   // Configurar botón de finalizar
   setupButtonFinishAutomatic();
@@ -620,7 +733,7 @@ function changeSelectorValue(selector, value) {
 
 async function setupCarreraSelect(carreras, defaultCarrera) {
   const { carreraSelect } = getComponents();
-  const { SAEScarreraSelect } = getSAESelements();
+  const { SAEScarreraSelect } = getSAEScomponents();
 
   // Cargar las carreras en el select de carreras
   const defaultOption = document.createElement("option");
@@ -675,7 +788,7 @@ async function setupCarreraSelect(carreras, defaultCarrera) {
 
 async function setupPlanSelect(planes, defaultPlan) {
   const { planLabel, planSelect } = getComponents();
-  const { SAESplanSelect } = getSAESelements();
+  const { SAESplanSelect } = getSAEScomponents();
 
   // Mostrar el label y selector de plan de estudio
   planLabel.hidden = false;
@@ -727,7 +840,7 @@ async function setupPlanSelect(planes, defaultPlan) {
 
 async function clasesScanner() {
   const { SAESturnoSelect, SAESperiodoSelect, SAEShorariosTable } =
-    getSAESelements();
+    getSAEScomponents();
 
   // Obtener los turnos pendientes de escanear
   let pendingTurnos = (await chrome.storage.local.get("pendingTurnos"))
@@ -1479,7 +1592,7 @@ function orderByHorasLibres(horarios) {
 
 function setupContainerHorariosGenerados(horariosGenerados, asignaturas) {
   const horariosGeneradosSlider = document.getElementById(
-    "horarios-generados-slider"
+    "horarios-slider-automatic"
   );
 
   // Limpiar el contenedor de horarios generados
@@ -1518,19 +1631,20 @@ function setupContainerHorariosGenerados(horariosGenerados, asignaturas) {
       <tbody></tbody>
       <tfoot>
         <tr>
-          <td colspan="9">MODS SAES 2 By ReprobadosDev</td>
+          <td id="credits" colspan="9">MODS SAES 2 By ReprobadosDev</td>
         </tr>
       </tfoot>
     `;
 
     const tbody = table.querySelector("tbody");
 
-    horario.clases.forEach((clase) => {
+    horario.clases.forEach((clase, index) => {
       const row = document.createElement("tr");
+      horario.clases[index].asignatura = asignaturas[clase.asignatura].text; // Reemplazar el ID de asignatura por el texto
 
       row.innerHTML = `
       <td>${clase.grupo}</td>
-      <td>${asignaturas[clase.asignatura].text}</td>
+      <td>${clase.asignatura}</td>
       <td>${clase.profesor}</td>
       <td>${clase.horas.lunes || ""}</td>
       <td>${clase.horas.martes || ""}</td>
@@ -1564,6 +1678,13 @@ function setupContainerHorariosGenerados(horariosGenerados, asignaturas) {
       let horariosGuardados =
         (await chrome.storage.local.get("userHorariosGuardados"))
           .userHorariosGuardados || [];
+
+      // Marcar origen del horario
+      horario.origin = "automatic";
+
+      // Agregar un ID único al horario
+      horario.id = Date.now();
+
       // Agregar el horario actual a los horarios guardados
       horariosGuardados.push(horario);
       // Guardar los horarios actualizados en el almacenamiento local
@@ -1598,4 +1719,300 @@ async function removeClase(claseId) {
 
   // Recargar la página para mostrar los horarios actualizados
   window.location.reload();
+}
+
+async function manualController() {
+  const { SAEShorariosTable } = getSAEScomponents();
+
+  // Configurar botón de finalizar
+  setupButtonFinishManual();
+
+  if (SAEShorariosTable) {
+    // Configurar tabla de horarios
+    setupTableHorarios(SAEShorariosTable);
+
+    // Obtener los horarios seleccionados del almacenamiento local
+    const horarioSeleccionado = (
+      await chrome.storage.local.get("userHorarioSeleccionado")
+    ).userHorarioSeleccionado;
+
+    if (horarioSeleccionado && horarioSeleccionado.clases.length > 0) {
+      setupContainerHorarioSeleccionado(horarioSeleccionado);
+    }
+  }
+}
+
+function setupTableHorarios(table) {
+  const rows = table.getElementsByTagName("tr");
+  // Quitar la primera fila (encabezado de la tabla)
+  const rowsArray = Array.from(rows).slice(1);
+
+  // Recorrer las filas de la tabla
+  for (let row of rowsArray) {
+    // Crear botón de añadir al horario
+    const buttonAdd = document.createElement("button");
+    buttonAdd.className = "button-micro";
+    buttonAdd.textContent = "+";
+
+    // Añadir evento click al botón
+    buttonAdd.addEventListener("click", async (event) => {
+      event.preventDefault();
+      const clase = {
+        id: Date.now(), // Usar timestamp como ID único
+        grupo: row.cells[0].textContent.trim(),
+        asignatura: row.cells[1].textContent.trim(),
+        profesor: row.cells[2].textContent.trim(),
+        horas: {
+          lunes: row.cells[5].textContent.trim(),
+          martes: row.cells[6].textContent.trim(),
+          miercoles: row.cells[7].textContent.trim(),
+          jueves: row.cells[8].textContent.trim(),
+          viernes: row.cells[9].textContent.trim(),
+        },
+      };
+
+      // Guardar la clase en el almacenamiento local
+      let horarioSeleccionado = (
+        await chrome.storage.local.get("userHorarioSeleccionado")
+      ).userHorarioSeleccionado || { clases: [] };
+      // Agregar la clase al array de horarios guardados
+      horarioSeleccionado.clases.push(clase);
+
+      // Guardar el horario actualizado en el almacenamiento local
+      await chrome.storage.local.set({
+        userHorarioSeleccionado: horarioSeleccionado,
+      });
+
+      // Recargar la página para mostrar los cambios
+      window.location.reload();
+    });
+
+    // Añadir el botón a la última celda de la fila
+    const lastCell = row.insertCell(-1);
+    lastCell.appendChild(buttonAdd);
+  }
+}
+
+function setupContainerHorarioSeleccionado(horarioSeleccionado) {
+  const horarioSeleccionadoSlider = document.getElementById(
+    "horarios-slider-manual"
+  );
+
+  // Limpiar el contenedor de horario seleccionado
+  horarioSeleccionadoSlider.innerHTML = "";
+
+  // Mostrar el horario seleccionado
+  const horarioDiv = document.createElement("div");
+  horarioDiv.className = "horario";
+
+  // Crear tabla
+  const table = document.createElement("table");
+
+  //table.style.borderCollapse = "collapse";
+  table.innerHTML = `
+      <thead>
+      <tr>
+        <th>Grupo</th>
+        <th>Asignatura</th>
+        <th>Profesor</th>
+        <th>Lun</th>
+        <th>Mar</th>
+        <th>Mie</th>
+        <th>Jue</th>
+        <th>Vie</th>
+        <th></th>
+      </tr>
+      </thead>
+      <tbody></tbody>
+      <tfoot>
+        <tr>
+          <td id="credits" colspan="9">MODS SAES 2 By ReprobadosDev</td>
+        </tr>
+      </tfoot>
+    `;
+
+  const tbody = table.querySelector("tbody");
+
+  horarioSeleccionado.clases.forEach((clase) => {
+    const row = document.createElement("tr");
+
+    row.innerHTML = `
+      <td>${clase.grupo}</td>
+      <td>${clase.asignatura}</td>
+      <td>${clase.profesor}</td>
+      <td>${clase.horas.lunes || ""}</td>
+      <td>${clase.horas.martes || ""}</td>
+      <td>${clase.horas.miercoles || ""}</td>
+      <td>${clase.horas.jueves || ""}</td>
+      <td>${clase.horas.viernes || ""}</td>
+      <td></td>
+      `;
+
+    // Crear botón de eliminar clase
+    const buttonEliminar = document.createElement("button");
+    buttonEliminar.className = "button-micro";
+    buttonEliminar.textContent = "X";
+    buttonEliminar.addEventListener("click", async () => {
+      // Obtener el horario seleccionado del almacenamiento local
+      let horarioSeleccionado = (
+        await chrome.storage.local.get("userHorarioSeleccionado")
+      ).userHorarioSeleccionado;
+
+      // Eliminar la clase con el ID especificado
+      const claseId = clase.id;
+      horarioSeleccionado.clases = horarioSeleccionado.clases.filter(
+        (c) => c.id !== claseId
+      );
+
+      // Guardar el horario actualizado en el almacenamiento local
+      await chrome.storage.local.set({
+        userHorarioSeleccionado: horarioSeleccionado,
+      });
+
+      // Recargar la página para mostrar los horarios actualizados
+      window.location.reload();
+    });
+
+    // Agregar el botón de eliminar a la última celda
+    const lastCell = row.querySelector("td:last-child");
+    lastCell.appendChild(buttonEliminar);
+
+    // Agregar la fila a la tabla
+    tbody.appendChild(row);
+  });
+
+  const buttonGuardar = document.createElement("button");
+  buttonGuardar.className = "button";
+  buttonGuardar.textContent = "Guardar";
+  buttonGuardar.addEventListener("click", async () => {
+    // Obtener los horarios generados del almacenamiento local
+    let horariosGuardados =
+      (await chrome.storage.local.get("userHorariosGuardados"))
+        .userHorariosGuardados || [];
+
+    // Marcar origen del horario
+    horarioSeleccionado.origin = "manual";
+
+    // Agregar un ID único al horario
+    horarioSeleccionado.id = Date.now();
+
+    // Agregar el horario actual a los horarios guardados
+    horariosGuardados.push(horarioSeleccionado);
+    // Guardar los horarios actualizados en el almacenamiento local
+    await chrome.storage.local.set({
+      userHorariosGuardados: horariosGuardados,
+    });
+
+    // Recargar la página para mostrar los horarios guardados
+    window.location.reload();
+  });
+
+  horarioDiv.appendChild(table);
+  horarioDiv.appendChild(buttonGuardar);
+
+  horarioSeleccionadoSlider.appendChild(horarioDiv);
+}
+
+function setupButtonFinishManual() {
+  const { buttonFinishManual } = getComponents();
+
+  buttonFinishManual.addEventListener("click", (event) => {
+    event.preventDefault();
+
+    chrome.storage.local.remove("userHorarioSeleccionado");
+    chrome.storage.local.set({ isManual: false });
+
+    window.location.reload();
+  });
+}
+
+function setupContainerHorariosGuardados(horarios) {
+  // Obtener el contenedor de horarios guardados
+  const horariosGuardadosSlider = document.getElementById(
+    "horarios-slider-guardados"
+  );
+
+  // Limpiar el contenedor de horarios guardados
+  horariosGuardadosSlider.innerHTML = "";
+
+  // Mostrar los horarios guardados
+  horarios.forEach((horario, index) => {
+    const horarioDiv = document.createElement("div");
+    horarioDiv.className = "horario";
+    horarioDiv.innerHTML = `<h3>Horario ${index + 1}</h3>`;
+    horarioDiv.innerHTML +=
+      horario.origin == "automatic"
+        ? `<p>Horas libres: ${horario.horasLibres}</p>`
+        : ""; // Si se usa innerHTML después de appendChild, los eventos de click se perderán
+
+    // Crear tabla
+    const table = document.createElement("table");
+
+    //table.style.borderCollapse = "collapse";
+    table.innerHTML = `
+      <thead>
+      <tr>
+        <th>Grupo</th>
+        <th>Asignatura</th>
+        <th>Profesor</th>
+        <th>Lun</th>
+        <th>Mar</th>
+        <th>Mie</th>
+        <th>Jue</th>
+        <th>Vie</th>
+      </tr>
+      </thead>
+      <tbody></tbody>
+      <tfoot>
+        <tr>
+          <td id="credits" colspan="9">MODS SAES 2 By ReprobadosDev</td>
+        </tr>
+      </tfoot>
+    `;
+
+    horario.clases.forEach((clase) => {
+      const row = document.createElement("tr");
+
+      row.innerHTML = `
+      <td>${clase.grupo}</td>
+      <td>${clase.asignatura}</td>
+      <td>${clase.profesor}</td>
+      <td>${clase.horas.lunes || ""}</td>
+      <td>${clase.horas.martes || ""}</td>
+      <td>${clase.horas.miercoles || ""}</td>
+      <td>${clase.horas.jueves || ""}</td>
+      <td>${clase.horas.viernes || ""}</td>
+      `;
+
+      // Agregar la fila a la tabla
+      const tbody = table.querySelector("tbody");
+      tbody.appendChild(row);
+    });
+
+    const buttonEliminarHorario = document.createElement("button");
+    buttonEliminarHorario.className = "button";
+    buttonEliminarHorario.textContent = "Borrar";
+    buttonEliminarHorario.addEventListener("click", async () => {
+      removeHorario(horario);
+    });
+    horarioDiv.appendChild(table);
+    horarioDiv.appendChild(buttonEliminarHorario);
+    horariosGuardadosSlider.appendChild(horarioDiv);
+  });
+}
+
+function removeHorario(horario) {
+  // Obtener los horarios guardados del almacenamiento local
+  chrome.storage.local.get("userHorariosGuardados", (result) => {
+    let horariosGuardados = result.userHorariosGuardados;
+
+    // Filtrar el horario a eliminar
+    horariosGuardados = horariosGuardados.filter((h) => h.id !== horario.id);
+
+    // Guardar los horarios actualizados en el almacenamiento local
+    chrome.storage.local.set({ userHorariosGuardados: horariosGuardados });
+
+    // Recargar la página para mostrar los horarios actualizados
+    window.location.reload();
+  });
 }

@@ -4,7 +4,6 @@
   "version": "1.0",
   "description": "Evolución del MOD SAES.",
   "permissions": ["storage", "activeTab", "scripting"],
-  "host_permissions": ["https://www.saes.upiita.ipn.mx/*"],
   "action": {
     "default_popup": "popup.html",
     "default_icon": "pfp_R.png"
@@ -14,8 +13,18 @@
   },
   "content_scripts": [
     {
-      "matches": ["https://www.saes.upiita.ipn.mx/Academica/horarios.aspx"],
+      "matches": ["*://*.ipn.mx/Academica/horarios.aspx"],
       "js": ["/content/horarios.js"]
+    },
+    {
+      "matches": ["*://*.ipn.mx/*"],
+      "js": ["/content/general.js"]
+    }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": ["*.png"],
+      "matches": ["<all_urls>"]
     }
   ]
 }
