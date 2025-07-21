@@ -13,7 +13,7 @@ window.addEventListener("load", async () => {
   // Cargar componentes HTML
   loadComponents();
 
-  // Cargar estilos CSS
+  // Cargar estilos CSSs
   loadStyles(isAutomatic);
 
   // Configurar el botón de generación automática
@@ -44,278 +44,6 @@ function loadFlags() {
 }
 
 function loadComponents() {
-  const MultiSelectTagScript = `
-  function MultiSelectTag(el, customs = { shadow: false, rounded: true }) {
-    var element = null;
-    var options = null;
-    var customSelectContainer = null;
-    var wrapper = null;
-    var btnContainer = null;
-    var body = null;
-    var inputContainer = null;
-    var inputBody = null;
-    var input = null;
-    var button = null;
-    var drawer = null;
-    var ul = null;
-    var domParser = new DOMParser();
-    init();
-
-    function init() {
-      element = document.getElementById(el);
-      createElements();
-      initOptions();
-      enableItemSelection();
-      setValues(false);
-
-      body.addEventListener("click", () => {
-        if (drawer.classList.contains("hidden")) {
-          initOptions();
-          enableItemSelection();
-          drawer.classList.remove("hidden");
-          input.focus();
-        }
-      });
-
-      input.addEventListener("keyup", (e) => {
-        initOptions(e.target.value);
-        enableItemSelection();
-      });
-
-      input.addEventListener("keydown", (e) => {
-        if (
-          e.key === "Backspace" &&
-          !e.target.value &&
-          inputContainer.childElementCount > 1
-        ) {
-          const child =
-            body.children[inputContainer.childElementCount - 2].firstChild;
-          const option = options.find((op) => op.value == child.dataset.value);
-          option.selected = false;
-          removeTag(child.dataset.value);
-          setValues();
-        }
-      });
-
-      window.addEventListener("click", (e) => {
-        if (!customSelectContainer.contains(e.target)) {
-          drawer.classList.add("hidden");
-        }
-      });
-    }
-
-    function createElements() {
-      // Create custom elements
-      options = getOptions();
-      element.classList.add("hidden");
-
-      // .multi-select-tag
-      customSelectContainer = document.createElement("div");
-      customSelectContainer.classList.add("mult-select-tag");
-
-      // .container
-      wrapper = document.createElement("div");
-      wrapper.classList.add("wrapper");
-
-      // body
-      body = document.createElement("div");
-      body.classList.add("body");
-      if (customs.shadow) {
-        body.classList.add("shadow");
-      }
-      if (customs.rounded) {
-        body.classList.add("rounded");
-      }
-
-      // .input-container
-      inputContainer = document.createElement("div");
-      inputContainer.classList.add("input-container");
-
-      // input
-      input = document.createElement("input");
-      input.classList.add("input");
-      input.placeholder = "Buscar...";
-
-      inputBody = document.createElement("inputBody");
-      inputBody.classList.add("input-body");
-      inputBody.append(input);
-
-      body.append(inputContainer);
-
-      // .btn-container
-      btnContainer = document.createElement("div");
-      btnContainer.classList.add("btn-container");
-
-      // button
-      button = document.createElement("button");
-      button.type = "button";
-      btnContainer.append(button);
-
-      const icon = domParser.parseFromString(
-        ${`<svg xmlns="http://www.w3.org/2000/svg" width="100%" height="100%" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <polyline points="18 15 12 21 6 15"></polyline></svg>`},
-        "image/svg+xml"
-      ).documentElement;
-      button.append(icon);
-
-      body.append(btnContainer);
-      wrapper.append(body);
-
-      drawer = document.createElement("div");
-      drawer.classList.add(...["drawer", "hidden"]);
-      if (customs.shadow) {
-        drawer.classList.add("shadow");
-      }
-      if (customs.rounded) {
-        drawer.classList.add("rounded");
-      }
-      drawer.append(inputBody);
-      ul = document.createElement("ul");
-
-      drawer.appendChild(ul);
-
-      customSelectContainer.appendChild(wrapper);
-      customSelectContainer.appendChild(drawer);
-
-      // Place TailwindTagSelection after the element
-      if (element.nextSibling) {
-        element.parentNode.insertBefore(
-          customSelectContainer,
-          element.nextSibling
-        );
-      } else {
-        element.parentNode.appendChild(customSelectContainer);
-      }
-    }
-
-    function initOptions(val = null) {
-      ul.innerHTML = "";
-      for (var option of options) {
-        if (option.selected) {
-          !isTagSelected(option.value) && createTag(option);
-        } else {
-          const li = document.createElement("li");
-          li.innerHTML = option.label;
-          li.dataset.value = option.value;
-
-          // For search
-          if (
-            val &&
-            option.label
-              .normalize("NFD")
-              .replace(/\p{Diacritic}/gu, "")
-              .toLowerCase()
-              .includes(
-                val
-                  .normalize("NFD")
-                  .replace(/\p{Diacritic}/gu, "")
-                  .toLowerCase()
-              )
-          ) {
-            ul.appendChild(li);
-          } else if (!val) {
-            ul.appendChild(li);
-          }
-        }
-      }
-    }
-
-    function createTag(option) {
-      // Create and show selected item as tag
-      const itemDiv = document.createElement("div");
-      itemDiv.classList.add("item-container");
-      const itemLabel = document.createElement("div");
-      itemLabel.classList.add("item-label");
-      itemLabel.innerHTML = option.label;
-      itemLabel.dataset.value = option.value;
-      const itemClose = new DOMParser().parseFromString(
-        ${`<svg xmlns="http://www.w3.org/2000/svg" width="100%" height="100%" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="item-close-svg">
-                  <line x1="18" y1="6" x2="6" y2="18"></line>
-                  <line x1="6" y1="6" x2="18" y2="18"></line>
-                  </svg>`},
-        "image/svg+xml"
-      ).documentElement;
-
-      itemClose.addEventListener("click", (e) => {
-        const unselectOption = options.find((op) => op.value == option.value);
-        unselectOption.selected = false;
-        removeTag(option.value);
-        initOptions();
-        setValues();
-      });
-
-      itemDiv.appendChild(itemLabel);
-      itemDiv.appendChild(itemClose);
-      inputContainer.append(itemDiv);
-    }
-
-    function enableItemSelection() {
-      // Add click listener to the list items
-      for (var li of ul.children) {
-        li.addEventListener("click", (e) => {
-          options.find(
-            (o) => o.value == e.target.dataset.value
-          ).selected = true;
-          input.value = null;
-          initOptions();
-          setValues();
-          //console.log('KKKKKKs');
-          input.focus();
-        });
-      }
-    }
-
-    function isTagSelected(val) {
-      // If the item is already selected
-      for (var child of inputContainer.children) {
-        if (
-          !child.classList.contains("input-body") &&
-          child.firstChild.dataset.value == val
-        ) {
-          return true;
-        }
-      }
-      return false;
-    }
-    function removeTag(val) {
-      // Remove selected item
-      for (var child of inputContainer.children) {
-        if (
-          !child.classList.contains("input-body") &&
-          child.firstChild.dataset.value == val
-        ) {
-          inputContainer.removeChild(child);
-        }
-      }
-    }
-    function setValues(fireEvent = true) {
-      // Update element final values
-      selected_values = [];
-      for (var i = 0; i < options.length; i++) {
-        element.options[i].selected = options[i].selected;
-        if (options[i].selected) {
-          selected_values.push({
-            label: options[i].label,
-            value: options[i].value,
-          });
-        }
-      }
-      if (fireEvent && customs.hasOwnProperty("onChange")) {
-        customs.onChange(selected_values);
-      }
-    }
-    function getOptions() {
-      // Map element options
-      return [...element.options].map((op) => {
-        return {
-          value: op.value,
-          label: op.label,
-          selected: op.selected,
-        };
-      });
-    }
-  }`;
-
   const html =
     // Contenido HTML
     `<div id="container">
@@ -329,7 +57,11 @@ function loadComponents() {
       </div>
 
       <div id="automatic-container">
-        <h3 class="panel-title">Generar horario</h3>
+        <div id="title-container">
+          <h3 class="panel-title">Generar horarios</h3>
+          <button id="button-automatic-update" class="mini-button">Actualizar</button>
+          <button id="button-automatic-finish" class="mini-button">Finalizar</button>
+        </div>
         <div id="form-container">
           <div>
             <label>Carrera:</label>
@@ -346,7 +78,15 @@ function loadComponents() {
             <select id="asignaturas-select" multiple hidden></select>
           </div>
         </div>
-        <button class="button" id="button-generate-automatic">Generar horario</button>
+        <button class="button" id="button-generate-automatic">Generar horarios</button>
+
+        <div id="warning">
+          <p>Generando horarios, por favor espera...</p>
+        </div>
+
+        <div id="horarios-generados-container">
+          <div id="horarios-generados-slider"></div>
+        </div>
       </div>
     </div>
   </div>`;
@@ -359,7 +99,7 @@ function loadComponents() {
   }
 }
 
-function loadStyles(isAutomatic) {
+function loadStyles(isAutomatic, isScanning) {
   const MultiSelectTagStyles = `
   .mult-select-tag {
       display: flex;
@@ -513,7 +253,7 @@ function loadStyles(isAutomatic) {
     // Hoja de estilos CSS
     `
     #container {
-      margin: 50px 0 30px;
+      margin: 50px 0 20px;
       display: block;
       font-family: Arial, sans-serif;
       color: black;
@@ -604,6 +344,120 @@ function loadStyles(isAutomatic) {
       box-shadow: 0 5px 9px rgba(0, 0, 0, 0.2);
     }
 
+    #warning {
+      background-color: #f0f0f0;
+      display: none;
+      justify-content: center;
+      align-items: center;
+      width: 100%;
+      height: 200px;
+      border-radius: 9px;
+      animation: caerRebotar 2s ease-in-out infinite; /* Animación infinita para el ejemplo */
+    }
+
+    @keyframes caerRebotar {
+      0% {
+      transform: translateY(0);
+      box-shadow: 0 0px 0px rgba(0, 0, 0, 0);
+      }
+      45% {
+      transform: translateY(-2px); /* Ligeramente más alto que tu ejemplo inicial */
+      box-shadow: 0 5px 9px rgba(0, 0, 0, 0.2);
+      }
+      50% {
+      transform: translateY(0); /* Empieza la caída */
+      box-shadow: 0 0px 0px rgba(0, 0, 0, 0);
+      }
+      60% {
+      transform: translateY(-1.5px); /* Simula tocar el fondo (ajusta si es necesario) */
+      box-shadow: 0 4.5px 7px rgba(0, 0, 0, 0.2); /* Sombra más fuerte al caer */
+      }
+      65% {
+      transform: translateY(0); /* Primer rebote más alto */
+      box-shadow: 0 0px 0px rgba(0, 0, 0, 0);
+      }
+      68% {
+      transform: translateY(-1px);
+      box-shadow: 0 3px 5px rgba(0, 0, 0, 0.2);
+      }
+      70% {
+      transform: translateY(0); /* Primer rebote más alto */
+      box-shadow: 0 0px 0px rgba(0, 0, 0, 0);
+      }
+      71% {
+        transform: translateY(0.25px);
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+      }
+      72% {
+        transform: translateY(0); /* Primer rebote más alto */
+        box-shadow: 0 0px 0px rgba(0, 0, 0, 0);
+      }
+    }
+
+    #horarios-generados-slider{
+      display: flex;
+      flex-direction: row;
+      gap: 11px;
+      overflow-x: scroll;
+      align-items: stretch;
+      scroll-snap-type: x mandatory;
+    }
+
+    #horarios-generados-slider > * {
+      scroll-snap-align: center;
+    }
+
+    .horario{
+      display: flex;
+      flex-direction: column;
+    }
+
+    .horario table {
+      font-size: 11px;
+      border-collapse: collapse;
+      border-radius: 9px;
+      box-shadow: 0 0 9px rgba(0, 0, 0, 0.2);
+      margin: 9px;
+      height: 100%;
+      overflow: hidden;
+    }
+
+    .horario th, .horario td {
+      text-align: center;
+      vertical-align: middle;
+    }
+
+    .horario th, tfoot {
+      background-color: #b90b05;
+      color: white;
+    }
+
+    .horario tr {
+      padding: 5px 0;
+    }
+
+    .horario tr:nth-child(even) {
+      background-color: #f0f0f0;
+    }
+
+    .button-micro{
+      border-radius: 100%;
+      font-size: 9px;
+      font-weight: bold;
+      color: white;
+      padding: 6.5px 8px;
+      background: #b90b05;
+      cursor: pointer;
+      transition: box-shadow 0.5s ease, transform 0.5s ease;
+    }
+
+    .button-micro:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 5px 9px rgba(0, 0, 0, 0.4);
+    }
+
+
+
     ${MultiSelectTagStyles}
   `;
 
@@ -636,6 +490,9 @@ function getComponents() {
     buttonGenerateAutomatic: document.getElementById(
       "button-generate-automatic"
     ),
+    warning: document.getElementById("warning"),
+    buttonUpdateAutomatic: document.getElementById("button-automatic-update"),
+    buttonFinishAutomatic: document.getElementById("button-automatic-finish"),
   };
 }
 
@@ -673,6 +530,9 @@ async function automaticController() {
   // Obtener elementos del SAES
   const { SAEScarreraSelect, SAESplanSelect } = getSAESelements();
 
+  // Configurar botón de finalizar
+  setupButtonFinishAutomatic();
+
   // Obtener las carreras disponibles y guardarlas en el almacenamiento local
   const carreras = getSelectorOptions(SAEScarreraSelect);
 
@@ -704,6 +564,9 @@ async function automaticController() {
       // Se realiza el escaneo de las clases si no se ha hecho antes o si se ha cambiado de carrera o plan
       await clasesScanner();
 
+      // Configurar botón de actualizar
+      setupButtonUpdateAutomatic();
+
       // Verificar si se ha completado el escaneo de clases
       const isScanCompleted = !(await chrome.storage.local.get("isScanning"))
         .isScanning;
@@ -724,6 +587,16 @@ async function automaticController() {
 
         // Configurar el formulario de generación de horarios
         setupButtonGenerateAutomatic();
+
+        // Obtener los horarios generados previamente
+        const horariosGenerados =
+          (await chrome.storage.local.get("userHorariosGenerados"))
+            .userHorariosGenerados || [];
+
+        // Si hay horarios generados, mostrarlos
+        if (horariosGenerados.length > 0) {
+          setupContainerHorariosGenerados(horariosGenerados, asignaturas);
+        }
       }
     }
   }
@@ -782,7 +655,7 @@ async function setupCarreraSelect(carreras, defaultCarrera) {
     chrome.storage.local.remove("selectedPlan");
 
     // Limpiar las clases escaneadas
-    chrome.storage.local.remove("clases");
+    chrome.storage.local.remove("dataClases");
 
     // Limpiar las asignaturas escaneadas
     chrome.storage.local.remove("dataAsignaturas");
@@ -791,6 +664,9 @@ async function setupCarreraSelect(carreras, defaultCarrera) {
     // Limpiar los turnos y periodos pendientes
     chrome.storage.local.remove("pendingTurnos");
     chrome.storage.local.remove("pendingPeriodos");
+
+    // Limpiar los horarios generados
+    chrome.storage.local.remove("userHorariosGenerados");
 
     // Seleccionar la carrera en el SAES
     changeSelectorValue(SAEScarreraSelect, selectedCarrera); // Esto recarga la página
@@ -835,11 +711,14 @@ async function setupPlanSelect(planes, defaultPlan) {
     chrome.storage.local.set({ selectedPlan });
 
     // Limpiar las clases escaneadas
-    chrome.storage.local.remove("clases");
+    chrome.storage.local.remove("dataClases");
 
     // Limpiar los turnos y periodos pendientes
     chrome.storage.local.remove("pendingTurnos");
     chrome.storage.local.remove("pendingPeriodos");
+
+    // Limpiar los horarios generados
+    chrome.storage.local.remove("userHorariosGenerados");
 
     // Seleccionar la carrera en el SAES
     changeSelectorValue(SAESplanSelect, selectedPlan); // Esto recarga la página
@@ -989,6 +868,41 @@ async function scannHorariosTable(horariosTable) {
   chrome.storage.local.set({ dataAsignaturas: asignaturas });
 }
 
+function setupButtonUpdateAutomatic() {
+  const { buttonUpdateAutomatic } = getComponents();
+
+  buttonUpdateAutomatic.addEventListener("click", (event) => {
+    event.preventDefault();
+
+    chrome.storage.local.remove("pendingPeriodos");
+    chrome.storage.local.remove("pendingTurnos");
+    chrome.storage.local.remove("dataClases");
+    chrome.storage.local.remove("dataAsignaturas");
+    chrome.storage.local.remove("selectedAsignaturas");
+    chrome.storage.local.remove("userHorariosGenerados");
+
+    window.location.reload();
+  });
+}
+
+function setupButtonFinishAutomatic() {
+  const { buttonFinishAutomatic } = getComponents();
+
+  buttonFinishAutomatic.addEventListener("click", (event) => {
+    event.preventDefault();
+
+    chrome.storage.local.remove("pendingPeriodos");
+    chrome.storage.local.remove("pendingTurnos");
+    chrome.storage.local.remove("selectedAsignaturas");
+    chrome.storage.local.remove("selectedCarrera");
+    chrome.storage.local.remove("selectedPlan");
+    chrome.storage.local.remove("userHorariosGenerados");
+    chrome.storage.local.set({ isAutomatic: false });
+
+    window.location.reload();
+  });
+}
+
 function setupAsignaturasSelect(asignaturas, selectedAsignaturas) {
   const { asignaturasSelect } = getComponents();
 
@@ -1010,7 +924,7 @@ function setupAsignaturasSelect(asignaturas, selectedAsignaturas) {
     );
 
     // Guardar las asignaturas seleccionadas en el almacenamiento local
-    chrome.storage.local.set({ selectedAsignaturas: selectedOptions });
+    //chrome.storage.local.set({ selectedAsignaturas: selectedOptions }); // Reemplazado por gurdar cada que se genera un horario
   });
 
   // Crear elemento de interfaz MultiSelectTag
@@ -1214,6 +1128,7 @@ function MultiSelectTag(el, customs = { shadow: false, rounded: true }) {
       removeTag(option.value);
       initOptions();
       setValues();
+      element.dispatchEvent(new Event("change"));
     });
 
     itemDiv.appendChild(itemLabel);
@@ -1229,6 +1144,7 @@ function MultiSelectTag(el, customs = { shadow: false, rounded: true }) {
         input.value = null;
         initOptions();
         setValues();
+        element.dispatchEvent(new Event("change"));
         //console.log('KKKKKKs');
         input.focus();
       });
@@ -1287,7 +1203,8 @@ function MultiSelectTag(el, customs = { shadow: false, rounded: true }) {
 }
 
 function setupButtonGenerateAutomatic() {
-  const { buttonGenerateAutomatic, asignaturasSelect } = getComponents();
+  const { buttonGenerateAutomatic, asignaturasSelect, warning } =
+    getComponents();
 
   buttonGenerateAutomatic.addEventListener("click", async (event) => {
     // Evitar que se recargue la página
@@ -1298,8 +1215,23 @@ function setupButtonGenerateAutomatic() {
       asignaturasSelect.selectedOptions
     ).map((option) => option.value);
 
+    // Si no hay asignaturas seleccionadas, no hacer nada
+    if (selectedAsignaturas.length === 0) return;
+
+    // Guardar las asignaturas seleccionadas en el almacenamiento local
+    chrome.storage.local.set({ selectedAsignaturas });
+
+    // Mostrar un mensaje de carga
+    warning.style.display = "flex";
+
     // Generar los horarios
-    await generateHorarios(selectedAsignaturas);
+    const horarios = await generateHorarios(selectedAsignaturas);
+
+    // Guardar los horarios generados en el almacenamiento local
+    chrome.storage.local.set({ userHorariosGenerados: horarios });
+
+    // Recargar la página para mostrar los resultados
+    window.location.reload();
   });
 }
 
@@ -1320,7 +1252,14 @@ async function generateHorarios(selectedAsignaturas) {
   // Ordenar los horarios de menor a mayor cantidad de horas libres
   const horariosOrdenados = orderByHorasLibres(horariosFiltrados);
 
-  console.log(horariosOrdenados);
+  // Si hay más de 100 horarios, solo tomar los primeros 100
+  // BORRAR EN UN FUTURO
+  /*
+  if (horariosOrdenados.length > 100) {
+    return horariosOrdenados.slice(0, 100);
+  }
+  */
+  return horariosOrdenados;
 }
 
 function filtrarClases(clases, asignaturas) {
@@ -1536,4 +1475,127 @@ function orderByHorasLibres(horarios) {
 
   // Ordenar los horarios por horas libres (de menor a mayor)
   return horarios.sort((a, b) => a.horasLibres - b.horasLibres);
+}
+
+function setupContainerHorariosGenerados(horariosGenerados, asignaturas) {
+  const horariosGeneradosSlider = document.getElementById(
+    "horarios-generados-slider"
+  );
+
+  // Limpiar el contenedor de horarios generados
+  horariosGeneradosSlider.innerHTML = "";
+
+  // Si hay más de 100 horarios generados, solo mostrar los primeros 100
+  if (horariosGenerados.length > 100) {
+    horariosGenerados = horariosGenerados.slice(0, 100);
+  }
+
+  // Mostrar los horarios generados
+  horariosGenerados.forEach((horario, index) => {
+    const horarioDiv = document.createElement("div");
+    horarioDiv.className = "horario";
+    horarioDiv.innerHTML = `<h3>Horario ${index + 1}</h3>`;
+    horarioDiv.innerHTML += `<p>Horas libres: ${horario.horasLibres}</p>`; // Si se usa innerHTML después de appendChild, los eventos de click se perderán
+
+    // Crear tabla
+    const table = document.createElement("table");
+
+    //table.style.borderCollapse = "collapse";
+    table.innerHTML = `
+      <thead>
+      <tr>
+        <th>Grupo</th>
+        <th>Asignatura</th>
+        <th>Profesor</th>
+        <th>Lun</th>
+        <th>Mar</th>
+        <th>Mie</th>
+        <th>Jue</th>
+        <th>Vie</th>
+        <th></th>
+      </tr>
+      </thead>
+      <tbody></tbody>
+      <tfoot>
+        <tr>
+          <td colspan="9">MODS SAES 2 By ReprobadosDev</td>
+        </tr>
+      </tfoot>
+    `;
+
+    const tbody = table.querySelector("tbody");
+
+    horario.clases.forEach((clase) => {
+      const row = document.createElement("tr");
+
+      row.innerHTML = `
+      <td>${clase.grupo}</td>
+      <td>${asignaturas[clase.asignatura].text}</td>
+      <td>${clase.profesor}</td>
+      <td>${clase.horas.lunes || ""}</td>
+      <td>${clase.horas.martes || ""}</td>
+      <td>${clase.horas.miercoles || ""}</td>
+      <td>${clase.horas.jueves || ""}</td>
+      <td>${clase.horas.viernes || ""}</td>
+      <td></td>
+      `;
+
+      // Crear botón de eliminar clase
+      const buttonEliminar = document.createElement("button");
+      buttonEliminar.className = "button-micro";
+      buttonEliminar.textContent = "X";
+      buttonEliminar.addEventListener("click", async () => {
+        removeClase(clase.id);
+      });
+
+      // Agregar el botón de eliminar a la última celda
+      const lastCell = row.querySelector("td:last-child");
+      lastCell.appendChild(buttonEliminar);
+
+      // Agregar la fila a la tabla
+      tbody.appendChild(row);
+    });
+
+    const buttonGuardar = document.createElement("button");
+    buttonGuardar.className = "button";
+    buttonGuardar.textContent = "Guardar";
+    buttonGuardar.addEventListener("click", async () => {
+      // Obtener los horarios generados del almacenamiento local
+      let horariosGuardados =
+        (await chrome.storage.local.get("userHorariosGuardados"))
+          .userHorariosGuardados || [];
+      // Agregar el horario actual a los horarios guardados
+      horariosGuardados.push(horario);
+      // Guardar los horarios actualizados en el almacenamiento local
+      await chrome.storage.local.set({
+        userHorariosGuardados: horariosGuardados,
+      });
+
+      // Recargar la página para mostrar los horarios guardados
+      window.location.reload();
+    });
+
+    horarioDiv.appendChild(table);
+    horarioDiv.appendChild(buttonGuardar);
+
+    horariosGeneradosSlider.appendChild(horarioDiv);
+  });
+}
+
+async function removeClase(claseId) {
+  // Obtener los horarios generados del almacenamiento local
+  let horariosGenerados = (
+    await chrome.storage.local.get("userHorariosGenerados")
+  ).userHorariosGenerados;
+
+  // Eliminar los horarios que contengan la clase con el ID especificado
+  horariosGenerados = horariosGenerados.filter(
+    (horario) => !horario.clases.some((clase) => clase.id === claseId)
+  );
+
+  // Guardar los horarios actualizados en el almacenamiento local
+  await chrome.storage.local.set({ userHorariosGenerados: horariosGenerados });
+
+  // Recargar la página para mostrar los horarios actualizados
+  window.location.reload();
 }
