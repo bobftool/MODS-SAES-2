@@ -1,9 +1,9 @@
 {
   "manifest_version": 3,
   "name": "MODS SAES 2 By ReprobadosDev",
-  "version": "1.0",
+  "version": "1.1",
   "description": "Evolución del MOD SAES.",
-  "permissions": ["storage", "activeTab", "scripting"],
+  "permissions": ["storage"],
   "action": {
     "default_popup": "popup.html",
     "default_icon": "pfp_R.png"
@@ -15,6 +15,10 @@
     {
       "matches": ["*://*.ipn.mx/Academica/horarios.aspx"],
       "js": ["/content/horarios.js"]
+    },
+    {
+      "matches": ["*://*.ipn.mx/Academica/Ocupabilidad_grupos.aspx"],
+      "js": ["/content/ocupabilidad.js"]
     },
     {
       "matches": ["*://*.ipn.mx/*"],

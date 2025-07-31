@@ -615,7 +615,7 @@ function getSAEScomponents() {
     ),
     SAEShorariosTable:
       document.getElementById("ctl00_mainCopy_dbgHorarios") ||
-      document.getElementById("regs"),
+      document.getElementById("regs"), // Compatibilidad con MODS SAES anterior
   };
 }
 
@@ -1007,8 +1007,6 @@ function setupButtonFinishAutomatic() {
     chrome.storage.local.remove("pendingPeriodos");
     chrome.storage.local.remove("pendingTurnos");
     chrome.storage.local.remove("selectedAsignaturas");
-    chrome.storage.local.remove("selectedCarrera");
-    chrome.storage.local.remove("selectedPlan");
     chrome.storage.local.remove("userHorariosGenerados");
     chrome.storage.local.set({ isAutomatic: false });
 
@@ -1674,7 +1672,7 @@ function setupContainerHorariosGenerados(horariosGenerados, asignaturas) {
     buttonGuardar.className = "button";
     buttonGuardar.textContent = "Guardar";
     buttonGuardar.addEventListener("click", async () => {
-      // Obtener los horarios generados del almacenamiento local
+      // Obtener los horarios guardados del almacenamiento local
       let horariosGuardados =
         (await chrome.storage.local.get("userHorariosGuardados"))
           .userHorariosGuardados || [];
