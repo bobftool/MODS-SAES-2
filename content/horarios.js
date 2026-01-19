@@ -616,6 +616,15 @@ function getComponents() {
     buttonUpdateAutomatic: document.getElementById("button-automatic-update"),
     buttonFinishAutomatic: document.getElementById("button-automatic-finish"),
     buttonFinishManual: document.getElementById("button-manual-finish"),
+    horariosGeneradosSlider: document.getElementById(
+      "horarios-slider-automatic"
+    ),
+    horariosSeleccionadoSlider: document.getElementById(
+      "horarios-slider-manual"
+    ),
+    horariosGuardadosSlider: document.getElementById(
+      "horarios-slider-guardados"
+    ),
   };
 }
 
@@ -1338,8 +1347,12 @@ function MultiSelectTag(el, customs = { shadow: false, rounded: true }) {
 }
 
 function setupButtonGenerateAutomatic() {
-  const { buttonGenerateAutomatic, asignaturasSelect, warning } =
-    getComponents();
+  const {
+    buttonGenerateAutomatic,
+    asignaturasSelect,
+    warning,
+    horariosGeneradosSlider,
+  } = getComponents();
 
   buttonGenerateAutomatic.addEventListener("click", async (event) => {
     // Evitar que se recargue la página
@@ -1347,6 +1360,12 @@ function setupButtonGenerateAutomatic() {
 
     // Mostrar un mensaje de carga
     warning.style.display = "flex";
+
+    // Ocultar el slider de horarios generados mientras se generan nuevos horarios
+    horariosGeneradosSlider.style.display = "none";
+
+    // Limpiar las clases eliminadas
+    chrome.storage.local.set({ userClasesEliminadas: [] });
 
     // Obtener las asignaturas seleccionados
     const selectedAsignaturas = Array.from(
@@ -1370,13 +1389,17 @@ function setupButtonGenerateAutomatic() {
   });
 }
 
-async function generateHorarios(selectedAsignaturas) {
+async function generateHorarios(selectedAsignaturas, clasesEliminadas = []) {
   // Obtener las clases escaneadas
   const clases =
     (await chrome.storage.local.get("dataClases")).dataClases || [];
 
   // Obtener solo las clases que coinciden con las asignaturas seleccionadas
-  const filteredClases = filtrarClases(clases, selectedAsignaturas);
+  const filteredClases = filtrarClases(
+    clases,
+    selectedAsignaturas,
+    clasesEliminadas
+  );
 
   // Generar horarios con todas las combinaciones de clases posibles
   const horarios = getHorarios(filteredClases);
@@ -1389,7 +1412,7 @@ async function generateHorarios(selectedAsignaturas) {
   return horariosOrdenados;
 }
 
-function filtrarClases(clases, asignaturas) {
+function filtrarClases(clases, asignaturas, clasesEliminadas = []) {
   // Arreglo para almacenar los arreglos de clases de cada asignatura
   let filteredClases = [];
 
@@ -1400,7 +1423,10 @@ function filtrarClases(clases, asignaturas) {
 
     // Se recorre cada clase y se verifica si la asignatura coincide con la asignatura actual
     for (const clase of clases) {
-      if (clase.asignatura == asignatura) {
+      if (
+        clase.asignatura == asignatura &&
+        !clasesEliminadas.includes(clase.id)
+      ) {
         // Se agrega la clase al arreglo de la asignatura actual
         filteredClases[filteredClases.length - 1].push(clase);
       }
@@ -1762,9 +1788,8 @@ function countHorasLibres(horario) {
 }
 
 function setupContainerHorariosGenerados(horariosGenerados, asignaturas) {
-  const horariosGeneradosSlider = document.getElementById(
-    "horarios-slider-automatic"
-  );
+  // Obtener el contenedor de horarios generados
+  const { horariosGeneradosSlider } = getComponents();
 
   // Limpiar el contenedor de horarios generados
   horariosGeneradosSlider.innerHTML = "";
@@ -1875,20 +1900,41 @@ function setupContainerHorariosGenerados(horariosGenerados, asignaturas) {
 }
 
 async function removeClase(claseId) {
-  // Obtener los horarios generados del almacenamiento local
-  let horariosGenerados = (
-    await chrome.storage.local.get("userHorariosGenerados")
-  ).userHorariosGenerados;
+  // Obtener componentes necesarios
+  const { warning, horariosGeneradosSlider } = getComponents();
 
-  // Eliminar los horarios que contengan la clase con el ID especificado
-  horariosGenerados = horariosGenerados.filter(
-    (horario) => !horario.clases.some((clase) => clase.id === claseId)
+  // Mostrar un mensaje de carga
+  warning.style.display = "flex";
+
+  // Ocultar el slider de horarios generados mientras se generan nuevos horarios
+  horariosGeneradosSlider.style.display = "none";
+
+  // Obtener las asignaturas seleccionados del almacenamiento local
+  const selectedAsignaturas =
+    (await chrome.storage.local.get("selectedAsignaturas"))
+      .selectedAsignaturas || [];
+
+  // Obtener las clases eliminadas del almacenamiento local
+  let clasesEliminadas =
+    (await chrome.storage.local.get("userClasesEliminadas"))
+      .userClasesEliminadas || [];
+
+  // Agregar la clase eliminada al array
+  clasesEliminadas.push(claseId);
+
+  // Guardar las clases eliminadas en el almacenamiento local
+  await chrome.storage.local.set({ userClasesEliminadas: clasesEliminadas });
+
+  // Generar los horarios
+  const horarios = await generateHorarios(
+    selectedAsignaturas,
+    clasesEliminadas
   );
 
-  // Guardar los horarios actualizados en el almacenamiento local
-  await chrome.storage.local.set({ userHorariosGenerados: horariosGenerados });
+  // Guardar los horarios generados en el almacenamiento local
+  chrome.storage.local.set({ userHorariosGenerados: horarios });
 
-  // Recargar la página para mostrar los horarios actualizados
+  // Recargar la página para mostrar los resultados
   window.location.reload();
 }
 
@@ -1965,9 +2011,8 @@ function setupTableHorarios(table) {
 }
 
 function setupContainerHorarioSeleccionado(horarioSeleccionado) {
-  const horarioSeleccionadoSlider = document.getElementById(
-    "horarios-slider-manual"
-  );
+  // Obtener el contenedor de horario seleccionado
+  const { horarioSeleccionadoSlider } = getComponents();
 
   // Limpiar el contenedor de horario seleccionado
   horarioSeleccionadoSlider.innerHTML = "";
@@ -2099,9 +2144,7 @@ function setupButtonFinishManual() {
 
 function setupContainerHorariosGuardados(horarios) {
   // Obtener el contenedor de horarios guardados
-  const horariosGuardadosSlider = document.getElementById(
-    "horarios-slider-guardados"
-  );
+  const { horariosGuardadosSlider } = getComponents();
 
   // Limpiar el contenedor de horarios guardados
   horariosGuardadosSlider.innerHTML = "";
