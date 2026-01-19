@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "MODS SAES 2 By ReprobadosDev",
-  "version": "1.1",
+  "version": "1.2",
   "description": "Evolución del MOD SAES.",
   "permissions": ["storage"],
   "action": {
@@ -19,6 +19,10 @@
     {
       "matches": ["*://*.ipn.mx/Academica/Ocupabilidad_grupos.aspx"],
       "js": ["/content/ocupabilidad.js"]
+    },
+    {
+      "matches": ["*://*.ipn.mx/Alumnos/Evaluacion_docente/califica_profe.aspx"],
+      "js": ["/content/evaluacion.js"]
     },
     {
       "matches": ["*://*.ipn.mx/*"],

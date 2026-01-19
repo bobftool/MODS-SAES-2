@@ -72,7 +72,9 @@ function loadFlags() {
 function loadComponents() {
   const html =
     // Contenido HTML
-    `<div class="reprobados-container">
+    `
+    <div id="loading-overlay"><strong>Escaneando horarios, por favor espera...</strong></div>
+    <div class="reprobados-container">
     <div class="panel-container">
       <div id="initial-container">
         <h3 class="panel-title">Crea tu horario</h3>
@@ -135,7 +137,8 @@ function loadComponents() {
           </div>
         </div>
     </div>
-  </div>`;
+  </div>
+  `;
 
   // Insertar el HTML a la página
   const containerElement = document.querySelector(".container");
@@ -255,7 +258,7 @@ function loadStyles(
   }
 
   .mult-select-tag ul li:hover {
-      background: #b90b05;
+      background: #D90452;
       color: white;
       font-weight: bold;
   }
@@ -303,6 +306,24 @@ function loadStyles(
   const styles =
     // Hoja de estilos CSS
     `
+    #loading-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(255, 255, 255, 0.420);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px); /* Safari */
+      color: #D90452;
+      display: none;
+      justify-content: center;
+      align-items: center;
+      font-size: 24px;
+      z-index: 9999;
+      filter: drop-shadow(0 0 50px white);
+    }
+
     .reprobados-container {
       margin: 20px 0 20px;
       display: block;
@@ -342,7 +363,7 @@ function loadStyles(
     .button {
       width: 100%;
       padding: 10px;
-      background-color: #b90b05;
+      background-color: #D90452;
       color: white;
       border: none;
       border-radius: 9px;
@@ -493,7 +514,7 @@ function loadStyles(
     }
 
     .horario th {
-      background: #b90b05; 
+      background: #D90452; 
       color: white;
     }
 
@@ -507,7 +528,7 @@ function loadStyles(
       font-weight: bold;
       color: white;
       padding: 6.5px 8px;
-      background: #b90b05;
+      background: #D90452;
       cursor: pointer;
       transition: box-shadow 0.5s ease, transform 0.5s ease;
     }
@@ -575,6 +596,7 @@ function setupButtonStartManual() {
 
 function getComponents() {
   return {
+    loadingOverlay: document.getElementById("loading-overlay"),
     panelContainer: document.getElementById("panel-container"),
     panelTitle: document.getElementById("panel-title"),
     initialContainer: document.getElementById("initial-container"),
@@ -841,6 +863,8 @@ async function setupPlanSelect(planes, defaultPlan) {
 async function clasesScanner() {
   const { SAESturnoSelect, SAESperiodoSelect, SAEShorariosTable } =
     getSAEScomponents();
+  const { loadingOverlay } = getComponents();
+  loadingOverlay.style.display = "flex"; // Mostrar overlay de carga
 
   // Obtener los turnos pendientes de escanear
   let pendingTurnos = (await chrome.storage.local.get("pendingTurnos"))
@@ -898,6 +922,7 @@ async function clasesScanner() {
     if (!currentTurno) {
       // Si no hay turnos pendientes, finalizar el escaneo
       chrome.storage.local.set({ isScanning: false });
+      loadingOverlay.style.display = "none"; // Mostrar overlay de carga
 
       return;
     } else {
@@ -1256,7 +1281,6 @@ function MultiSelectTag(el, customs = { shadow: false, rounded: true }) {
         initOptions();
         setValues();
         element.dispatchEvent(new Event("change"));
-        //console.log('KKKKKKs');
         input.focus();
       });
     }
@@ -1321,6 +1345,9 @@ function setupButtonGenerateAutomatic() {
     // Evitar que se recargue la página
     event.preventDefault();
 
+    // Mostrar un mensaje de carga
+    warning.style.display = "flex";
+
     // Obtener las asignaturas seleccionados
     const selectedAsignaturas = Array.from(
       asignaturasSelect.selectedOptions
@@ -1331,9 +1358,6 @@ function setupButtonGenerateAutomatic() {
 
     // Guardar las asignaturas seleccionadas en el almacenamiento local
     chrome.storage.local.set({ selectedAsignaturas });
-
-    // Mostrar un mensaje de carga
-    warning.style.display = "flex";
 
     // Generar los horarios
     const horarios = await generateHorarios(selectedAsignaturas);
@@ -1357,19 +1381,11 @@ async function generateHorarios(selectedAsignaturas) {
   // Generar horarios con todas las combinaciones de clases posibles
   const horarios = getHorarios(filteredClases);
 
-  // Eliminar horarios con traslapes
-  const horariosFiltrados = removeTraslapes(horarios);
-
   // Ordenar los horarios de menor a mayor cantidad de horas libres
-  const horariosOrdenados = orderByHorasLibres(horariosFiltrados);
+  const horariosOrdenados = horarios.sort(
+    (a, b) => a.horasLibres - b.horasLibres
+  );
 
-  // Si hay más de 100 horarios, solo tomar los primeros 100
-  // BORRAR EN UN FUTURO
-  /*
-  if (horariosOrdenados.length > 100) {
-    return horariosOrdenados.slice(0, 100);
-  }
-  */
   return horariosOrdenados;
 }
 
@@ -1397,6 +1413,37 @@ function filtrarClases(clases, asignaturas) {
 function getHorarios(clasesFiltradas) {
   let horarios = [];
 
+  // Contar el total de combinaciones posibles
+  const totalCombinations = countCombinations(clasesFiltradas);
+
+  // Si el total de combinaciones es menor o igual a 1 millón, generar todas las combinaciones
+  if (totalCombinations <= 1_000_000) {
+    horarios = generateAllCombinations(clasesFiltradas);
+  } else {
+    // Si el total de combinaciones es mayor a 1 millón, generar combinaciones aleatorias
+    horarios = generateRandomCombinations(clasesFiltradas, totalCombinations);
+  }
+
+  return horarios;
+}
+
+function countCombinations(clasesFiltradas) {
+  let combinations = 1;
+  for (let i = 0; i < clasesFiltradas.length; i++) {
+    const size = clasesFiltradas[i]?.length ?? 0;
+    combinations *= size;
+  }
+  return combinations;
+}
+
+function generateAllCombinations(clasesFiltradas) {
+  let horarios = [];
+  let forbiddenPairsOfClases = [];
+  let worstHorario = {
+    index: -1,
+    horasLibres: -1,
+  };
+
   function generateCombinations(clasesArray, currentIndex) {
     // Verificar si la asignatura actual tiene clases
     if (clasesFiltradas[currentIndex].length > 0) {
@@ -1406,10 +1453,44 @@ function getHorarios(clasesFiltradas) {
         var newArray = clasesArray.slice(0);
         // Agregar la clase actual al array de clases de esta combinación
         newArray.push(clasesFiltradas[currentIndex][j]);
+
+        // Si la combinación parcial contiene un par prohibido, descartar esta rama
+        if (hasForbiddenPair(newArray, forbiddenPairsOfClases)) continue;
+
         // Verificar si hemos llegado al final de las asignaturas
         if (currentIndex === clasesFiltradas.length - 1) {
-          // Si es así, agregar esta combinación a los horarios
-          horarios.push(newArray);
+          // Si es así, verificar que no tenga traslapes antes de agregar esta combinación a los horarios
+          let traslapes = checkTraslapes(newArray);
+
+          if (traslapes.tieneTraslapes) {
+            // Almacenar las clases que generan traslapes
+            forbiddenPairsOfClases.push(...traslapes.clases);
+          } else {
+            // Contar la cantidad de horas libres en el horario
+            let horario = {
+              clases: newArray,
+              horasLibres: countHorasLibres(newArray),
+            };
+
+            // Mantener solo los 69 mejores horarios (con menor cantidad de horas libres)
+            if (horarios.length >= 69) {
+              // Encontrar el peor horario si no se ha encontrado aún
+              if (worstHorario.index === -1)
+                worstHorario = findWorstHorario(horarios);
+
+              // Comparar el nuevo horario con el peor horario
+              if (horario.horasLibres < worstHorario.horasLibres) {
+                // Reemplazar el peor horario por el nuevo horario
+                horarios[worstHorario.index] = horario;
+
+                // Buscar el nuevo peor horario
+                worstHorario = findWorstHorario(horarios);
+              }
+            } else {
+              // Agregar el horario al array de horarios
+              horarios.push(horario);
+            }
+          }
         } else {
           // Si no, continuar generando combinaciones con la siguiente asignatura
           generateCombinations(newArray, currentIndex + 1);
@@ -1433,9 +1514,115 @@ function getHorarios(clasesFiltradas) {
   return horarios;
 }
 
-function removeTraslapes(horarios) {
-  let horariosFiltrados = [];
+function generateRandomCombinations(clasesFiltradas, totalCombinations) {
+  const n = clasesFiltradas.length;
+  const k = 1_000_000;
 
+  let horarios = [];
+  let forbiddenPairsOfClases = [];
+  let worstHorario = {
+    index: -1,
+    horasLibres: -1,
+  };
+
+  // Generar k índices aleatorios ÚNICOS (solo números, no combinaciones)
+  const used = new Set();
+
+  while (used.size < k) {
+    const idx = Math.floor(Math.random() * totalCombinations);
+    used.add(idx); // si ya estaba, Set no crece; seguimos intentando
+  }
+
+  // Recorrer cada índice único y convertirlo a una combinación (1 elemento por grupo)
+  for (const idx0 of used) {
+    let idx = idx0;
+
+    // Convertimos "idx" a una selección de 1 elemento por grupo
+    // usando "base mixta": cada grupo tiene base = tamaño del grupo.
+    const combo = new Array(n);
+
+    for (let i = n - 1; i >= 0; i--) {
+      const size = clasesFiltradas[i].length;
+
+      const pickIndex = idx % size; // qué elemento tomamos del grupo i
+      combo[i] = clasesFiltradas[i][pickIndex]; // el elemento elegido
+
+      idx = Math.floor(idx / size); // reducimos el índice para el siguiente grupo
+    }
+
+    // combo = [1 clase de la asignatura 0, 1 de la asignatura 1, ...]
+
+    // Si la combinación parcial contiene un par prohibido, descartar esta rama
+    if (hasForbiddenPair(combo, forbiddenPairsOfClases)) continue;
+
+    // Verificar que no tenga traslapes antes de agregar esta combinación a los horarios
+    let traslapes = checkTraslapes(combo);
+
+    if (traslapes.tieneTraslapes) {
+      // Almacenar las clases que generan traslapes
+      forbiddenPairsOfClases.push(...traslapes.clases);
+    } else {
+      // Contar la cantidad de horas libres en el horario
+      let horario = {
+        clases: combo,
+        horasLibres: countHorasLibres(combo),
+      };
+
+      // Mantener solo los 69 mejores horarios (con menor cantidad de horas libres)
+      if (horarios.length >= 69) {
+        // Encontrar el peor horario si no se ha encontrado aún
+        if (worstHorario.index === -1)
+          worstHorario = findWorstHorario(horarios);
+
+        // Comparar el nuevo horario con el peor horario
+        if (horario.horasLibres < worstHorario.horasLibres) {
+          // Si el nuevo horario es mejor, reemplazar el peor horario por el nuevo horario
+          horarios[worstHorario.index] = horario;
+
+          // Buscar el nuevo peor horario
+          worstHorario = findWorstHorario(horarios);
+        }
+      } else {
+        // Agregar el horario al array de horarios
+        horarios.push(horario);
+      }
+    }
+  }
+
+  return horarios;
+}
+
+function hasForbiddenPair(clasesArray, forbiddenPairsOfClases) {
+  // Obtener los ids presentes en la combinación parcial
+  const ids = new Set(clasesArray.map((c) => c.id));
+
+  // Revisar cada par prohibido
+  for (const [id1, id2] of forbiddenPairsOfClases) {
+    if (ids.has(id1) && ids.has(id2)) {
+      return true; // combinación inválida
+    }
+  }
+
+  return false; // combinación válida
+}
+
+function findWorstHorario(horarios) {
+  let worstHorario = {
+    index: -1,
+    horasLibres: -1,
+  };
+
+  for (let i = 0; i < horarios.length; i++) {
+    if (horarios[i].horasLibres > worstHorario.horasLibres) {
+      worstHorario.horasLibres = horarios[i].horasLibres;
+      worstHorario.index = i;
+    }
+  }
+
+  return worstHorario;
+}
+
+function checkTraslapes(horario) {
   // Función para verificar si dos intervalos se traslapan
   function seTraslapan(inicio1, final1, inicio2, final2) {
     // Función para convertir una cadena de tiempo "HH:mm" a minutos
@@ -1454,67 +1641,64 @@ function removeTraslapes(horarios) {
     return inicio1Min < final2Min && final1Min > inicio2Min;
   }
 
-  // Iterar sobre los horarios
-  for (let i = 0; i < horarios.length; i++) {
-    const horario = horarios[i];
-    let tieneTraslapes = false;
+  // Variable para indicar si se encontraron traslapes
+  let traslapes = {
+    tieneTraslapes: false,
+    clases: [],
+  };
 
-    // Objeto para agrupar los horarios por día
-    const horasPorDia = {};
+  // Objeto para agrupar los horarios por día
+  const horasPorDia = {};
 
-    // Organizar los horarios por día
-    horario.forEach((clase) => {
-      Object.entries(clase.horas).forEach(([dia, hora]) => {
-        if (hora === "") return; // Si no hay hora, saltar
+  // Organizar los horarios por día
+  horario.forEach((clase) => {
+    Object.entries(clase.horas).forEach(([dia, hora]) => {
+      if (hora === "") return; // Si no hay hora, saltar
 
-        // Si el día no existe en horasPorDia, inicializarlo
-        if (!horasPorDia[dia]) {
-          horasPorDia[dia] = [];
-        }
+      // Si el día no existe en horasPorDia, inicializarlo
+      if (!horasPorDia[dia]) {
+        horasPorDia[dia] = [];
+      }
 
-        // Agregar la clase al día correspondiente
-        horasPorDia[dia].push({
-          id: clase.id,
-          inicio: hora.split("-")[0].trim(),
-          final: hora.split("-")[1].trim(),
-        });
+      // Agregar la clase al día correspondiente
+      horasPorDia[dia].push({
+        id: clase.id,
+        inicio: hora.split("-")[0].trim(),
+        final: hora.split("-")[1].trim(),
       });
     });
+  });
 
-    // Verificar traslapes en cada día
-    for (const dia in horasPorDia) {
-      const horasDia = horasPorDia[dia];
+  // Verificar traslapes en cada día
+  for (const dia in horasPorDia) {
+    const horasDia = horasPorDia[dia];
 
-      for (let j = 0; j < horasDia.length; j++) {
-        for (let k = j + 1; k < horasDia.length; k++) {
-          const hora1 = horasDia[j];
-          const hora2 = horasDia[k];
+    for (let j = 0; j < horasDia.length; j++) {
+      for (let k = j + 1; k < horasDia.length; k++) {
+        const hora1 = horasDia[j];
+        const hora2 = horasDia[k];
 
-          if (
-            hora1.id !== hora2.id &&
-            seTraslapan(hora1.inicio, hora1.final, hora2.inicio, hora2.final)
-          ) {
-            // Se detectó un traslape entre hora1.id y hora2.id
-            tieneTraslapes = true;
+        if (
+          hora1.id !== hora2.id &&
+          seTraslapan(hora1.inicio, hora1.final, hora2.inicio, hora2.final)
+        ) {
+          // Se detectó un traslape entre hora1.id y hora2.id
+          traslapes.tieneTraslapes = true;
 
-            break;
-          }
+          // Almacenar las clases que se traslapan
+          traslapes.clases.push([hora1.id, hora2.id]);
+          //break;
         }
-        if (tieneTraslapes) break;
       }
-      if (tieneTraslapes) break;
+      //if (traslapes.tieneTraslapes) break;
     }
-
-    // Si no hay traslapes, agregar el horario a los filtrados
-    if (!tieneTraslapes) {
-      horariosFiltrados.push(horario);
-    }
+    //if (traslapes.tieneTraslapes) break;
   }
 
-  return horariosFiltrados;
+  return traslapes;
 }
 
-function orderByHorasLibres(horarios) {
+function countHorasLibres(horario) {
   // Función para convertir una hora en formato "HH:MM" a minutos
   function convertirAMinutos(hora) {
     const [horas, minutos] = hora.split(":").map(Number);
@@ -1526,66 +1710,55 @@ function orderByHorasLibres(horarios) {
     return minutos / 60;
   }
 
-  // Procesar cada horario
-  for (let i = 0; i < horarios.length; i++) {
-    const horario = horarios[i];
+  // Objeto para almacenar las horas ocupadas y rangos por día
+  const horasPorDia = {};
 
-    // Objeto para almacenar las horas ocupadas y rangos por día
-    const horasPorDia = {};
+  // Calcular horas ocupadas y rangos por día
+  horario.forEach((clase) => {
+    Object.entries(clase.horas).forEach(([dia, hora]) => {
+      if (hora === "") return; // Si no hay hora, saltar
+      const inicio = convertirAMinutos(hora.split("-")[0].trim());
+      const final = convertirAMinutos(hora.split("-")[1].trim());
 
-    // Calcular horas ocupadas y rangos por día
-    horario.forEach((clase) => {
-      Object.entries(clase.horas).forEach(([dia, hora]) => {
-        if (hora === "") return; // Si no hay hora, saltar
-        const inicio = convertirAMinutos(hora.split("-")[0].trim());
-        const final = convertirAMinutos(hora.split("-")[1].trim());
-
-        if (!horasPorDia[dia]) {
-          horasPorDia[dia] = {
-            horasOcupadas: 0,
-            horaInicioDia: inicio,
-            horaFinalDia: final,
-          };
-        } else {
-          // Actualizar el rango del día
-          if (inicio < horasPorDia[dia].horaInicioDia) {
-            horasPorDia[dia].horaInicioDia = inicio;
-          }
-          if (final > horasPorDia[dia].horaFinalDia) {
-            horasPorDia[dia].horaFinalDia = final;
-          }
+      if (!horasPorDia[dia]) {
+        horasPorDia[dia] = {
+          horasOcupadas: 0,
+          horaInicioDia: inicio,
+          horaFinalDia: final,
+        };
+      } else {
+        // Actualizar el rango del día
+        if (inicio < horasPorDia[dia].horaInicioDia) {
+          horasPorDia[dia].horaInicioDia = inicio;
         }
+        if (final > horasPorDia[dia].horaFinalDia) {
+          horasPorDia[dia].horaFinalDia = final;
+        }
+      }
 
-        // Sumar las horas ocupadas
-        horasPorDia[dia].horasOcupadas += final - inicio;
-      });
+      // Sumar las horas ocupadas
+      horasPorDia[dia].horasOcupadas += final - inicio;
     });
+  });
 
-    // Calcular las horas libres por día y el total de horas libres
-    let totalHorasLibres = 0;
+  // Calcular las horas libres por día y el total de horas libres
+  let totalHorasLibres = 0;
 
-    for (const dia in horasPorDia) {
-      const { horaInicioDia, horaFinalDia, horasOcupadas } = horasPorDia[dia];
+  for (const dia in horasPorDia) {
+    const { horaInicioDia, horaFinalDia, horasOcupadas } = horasPorDia[dia];
 
-      // Calcular las horas totales del día
-      const horasTotales = horaFinalDia - horaInicioDia;
+    // Calcular las horas totales del día
+    const horasTotales = horaFinalDia - horaInicioDia;
 
-      // Calcular las horas libres del día
-      const horasLibresDia = horasTotales - horasOcupadas;
+    // Calcular las horas libres del día
+    const horasLibresDia = horasTotales - horasOcupadas;
 
-      // Sumar al total de horas libres
-      totalHorasLibres += convertirAHorasDecimales(horasLibresDia);
-    }
-
-    // Asignar las horas libres al horario
-    horarios[i] = {
-      clases: horario,
-      horasLibres: totalHorasLibres,
-    };
+    // Sumar al total de horas libres
+    totalHorasLibres += convertirAHorasDecimales(horasLibresDia);
   }
 
-  // Ordenar los horarios por horas libres (de menor a mayor)
-  return horarios.sort((a, b) => a.horasLibres - b.horasLibres);
+  // Devolver las horas libres del horario
+  return totalHorasLibres;
 }
 
 function setupContainerHorariosGenerados(horariosGenerados, asignaturas) {

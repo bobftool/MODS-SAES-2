@@ -177,7 +177,7 @@ function loadStyles() {
     .button {
       width: 100%;
       padding: 10px;
-      background-color: #b90b05;
+      background-color: #D90452;
       color: white;
       border: none;
       border-radius: 9px;
@@ -234,7 +234,7 @@ function loadStyles() {
     }
 
     .horario th {
-      background: #b90b05; 
+      background: #D90452; 
       color: white;
     }
 
@@ -248,7 +248,7 @@ function loadStyles() {
       font-weight: bold;
       color: white;
       padding: 6.5px 8px;
-      background: #b90b05;
+      background: #D90452;
       cursor: pointer;
       transition: box-shadow 0.5s ease, transform 0.5s ease;
     }
@@ -338,7 +338,7 @@ function setupContainerHorariosGuardados(horarios) {
 
     horario.clases.forEach((clase) => {
       const row = document.createElement("tr");
-      row.style.color = clase.cupo <= 0 ? "#b90b05" : ""; // Cambiar el color de la fila si el cupo es 0
+      row.style.color = clase.cupo <= 0 ? "#D90452" : ""; // Cambiar el color de la fila si el cupo es 0
 
       row.innerHTML = `
         <td>${clase.grupo}</td>
