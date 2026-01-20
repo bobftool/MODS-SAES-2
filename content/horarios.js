@@ -109,6 +109,7 @@ function loadComponents() {
         <button class="button" id="button-generate-automatic">Generar horarios</button>
 
         <div id="warning">
+          <img src="https://williamturner-grading.com/images/others/wytgrd-loader-gif.gif" alt="Cargando" style="width: 150px; margin-right: -27px;">
           <p>Generando horarios, por favor espera...</p>
         </div>
 
@@ -1488,10 +1489,8 @@ function generateAllCombinations(clasesFiltradas) {
           // Si es así, verificar que no tenga traslapes antes de agregar esta combinación a los horarios
           let traslapes = checkTraslapes(newArray);
 
-          if (traslapes.tieneTraslapes) {
-            // Almacenar las clases que generan traslapes
-            forbiddenPairsOfClases.push(...traslapes.clases);
-          } else {
+          // Si no tiene traslapes, agregar esta combinación a los horarios
+          if (!traslapes.tieneTraslapes) {
             // Contar la cantidad de horas libres en el horario
             let horario = {
               clases: newArray,
@@ -1516,6 +1515,9 @@ function generateAllCombinations(clasesFiltradas) {
               // Agregar el horario al array de horarios
               horarios.push(horario);
             }
+          } else {
+            // Almacenar las clases que generan traslapes
+            forbiddenPairsOfClases.push(...traslapes.clases);
           }
         } else {
           // Si no, continuar generando combinaciones con la siguiente asignatura
