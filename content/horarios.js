@@ -1041,6 +1041,8 @@ function setupButtonFinishAutomatic() {
 
     chrome.storage.local.remove("pendingPeriodos");
     chrome.storage.local.remove("pendingTurnos");
+    chrome.storage.local.remove("dataClases");
+    chrome.storage.local.remove("dataAsignaturas");
     chrome.storage.local.remove("selectedAsignaturas");
     chrome.storage.local.remove("userHorariosGenerados");
     chrome.storage.local.set({ isAutomatic: false });
