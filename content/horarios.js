@@ -2014,7 +2014,10 @@ function setupTableHorarios(table) {
 
 function setupContainerHorarioSeleccionado(horarioSeleccionado) {
   // Obtener el contenedor de horario seleccionado
-  const { horarioSeleccionadoSlider } = getComponents();
+  //const { horarioSeleccionadoSlider } = getComponents(); // No funciona correctamente
+  const horarioSeleccionadoSlider = document.getElementById(
+    "horarios-slider-manual"
+  );
 
   // Limpiar el contenedor de horario seleccionado
   horarioSeleccionadoSlider.innerHTML = "";
